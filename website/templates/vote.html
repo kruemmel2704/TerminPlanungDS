@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Abstimmen - {{ poll.title }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <h2>Abstimmung: {{ poll.title }}</h2>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">{{ poll.description if poll.description else 'Bitte wähle den Termin aus, an dem du Zeit hast.' }}</p>
+    
+    <form method="POST">
+        <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--glass-bg); border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+             {% if user.avatar %}
+                <img src="https://cdn.discordapp.com/avatars/{{ user.discord_id }}/{{ user.avatar }}.png" style="width: 32px; height: 32px; border-radius: 50%;">
+            {% endif %}
+            <span>Abstimmung als <strong>{{ user.username }}</strong></span>
+        </div>
+
+        <h3>Verfügbare Termine</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Wähle alle Termine aus, an denen du Zeit hast:</p>
+        
+        <div class="options-list">
+            {% for option in poll.options %}
+                <label class="option-item">
+                    <input type="checkbox" name="option_ids" value="{{ option.id }}">
+                    <span>
+                        <strong>{{ option.start_time.strftime('%d.%m.%Y') }}</strong><br>
+                        {{ option.start_time.strftime('%H:%M') }} - {{ option.end_time.strftime('%H:%M') }}
+                    </span>
+                </label>
+            {% endfor %}
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem;">Stimme abgeben</button>
+    </form>
+</div>
+{% endblock %}

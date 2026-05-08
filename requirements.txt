@@ -1,0 +1,10 @@
+flask
+flask-sqlalchemy
+flask-login
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+python-dotenv
+requests
+discord.py

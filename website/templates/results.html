@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Ergebnisse - {{ poll.title }}{% endblock %}
+
+{% block content %}
+<div class="text-center mb-2">
+    <h1>Ergebnisse: {{ poll.title }}</h1>
+    {% if not poll.is_active %}
+        <div class="winner-badge" style="background: #4caf50; font-size: 1.2rem; padding: 0.5rem 1.5rem;">Abgeschlossen</div>
+    {% else %}
+        <p style="color: var(--text-muted)">Läuft noch bis {{ poll.deadline.strftime('%d.%m.%Y %H:%M') }}</p>
+    {% endif %}
+</div>
+
+{% if winner and not poll.is_active %}
+    <div class="card" style="border: 2px solid #4caf50; background: rgba(76, 175, 80, 0.05);">
+        <h2 style="color: #4caf50;">Gewählter Termin 🏆</h2>
+        <p style="font-size: 1.5rem; font-weight: bold; margin: 1rem 0;">
+            {{ winner.option.start_time.strftime('%d.%m.%Y um %H:%M') }} Uhr
+        </p>
+        <p>Anzahl Stimmen: <strong>{{ winner.votes_count }}</strong></p>
+        <div class="voters-list mt-1">
+            <strong>Abgestimmt haben:</strong> {{ winner.voters|join(', ') }}
+        </div>
+        {% if poll.calendar_id %}
+            <p class="mt-1" style="color: #4caf50; font-size: 0.9rem;">✓ In Google Kalender eingetragen</p>
+        {% endif %}
+    </div>
+{% endif %}
+
+<div class="results-container mt-1">
+    <h3>Alle Terminvorschläge</h3>
+    {% for res in results %}
+        {% if poll.status == 'finalized' %}
+    <div class="card mb-1" style="border: 1px solid var(--primary); background: rgba(128, 0, 32, 0.1);">
+        <h3 style="color: var(--primary);">🛡️ Finales Roster</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+            <div>
+                <strong>War Orga:</strong><br>
+                {{ poll.war_orga }}
+            </div>
+            <div>
+                <strong>Spieler:</strong><br>
+                {{ poll.players }}
+            </div>
+            {% if poll.substitutes %}
+            <div>
+                <strong>Ersatz:</strong><br>
+                {{ poll.substitutes }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <strong>{{ res.option.start_time.strftime('%d.%m.%Y') }}</strong><br>
+                    {{ res.option.start_time.strftime('%H:%M') }} - {{ res.option.end_time.strftime('%H:%M') }}
+                </div>
+                <div class="text-right">
+                    <span style="font-size: 1.2rem; font-weight: bold;">{{ res.votes_count }}</span> Stimmen
+                </div>
+            </div>
+            
+            <div class="progress-bar-bg">
+                {% set total_votes = results|sum(attribute='votes_count') %}
+                {% if total_votes > 0 %}
+                    <div class="progress-bar-fill" style="width: {{ (res.votes_count / total_votes * 100)|round }}%"></div>
+                {% else %}
+                    <div class="progress-bar-fill" style="width: 0%"></div>
+                {% endif %}
+            </div>
+            
+            <div class="voters-list">
+                {{ res.voters|join(', ') }}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="text-center mt-1">
+    <a href="/" class="btn btn-outline">Zurück zur Übersicht</a>
+</div>
+{% endblock %}

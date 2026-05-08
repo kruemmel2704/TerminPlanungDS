@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Termin Bestätigen - {{ poll.title }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <h2>Termin & Roster bestätigen</h2>
+    <p style="color: var(--text-muted);">Abstimmungsergebnis: <strong>{{ winner.option.start_time.strftime('%d.%m.%Y um %H:%M') }} Uhr</strong> ({{ winner.votes_count }} Stimmen)</p>
+    
+    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0;">
+
+    <form method="POST">
+        <div class="form-group">
+            <label>Finaler Termin (Kann hier noch angepasst werden)</label>
+            <div style="display: flex; gap: 1rem;">
+                <div style="flex: 1">
+                    <label style="font-size: 0.8rem;">Start</label>
+                    <input type="datetime-local" name="final_start" value="{{ winner.option.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                </div>
+                <div style="flex: 1">
+                    <label style="font-size: 0.8rem;">Ende</label>
+                    <input type="datetime-local" name="final_end" value="{{ winner.option.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 2rem;">Roster Planung</h3>
+        
+        <div class="form-group">
+            <label for="war_orga">War Orga (1 Person)</label>
+            <input type="text" id="war_orga" name="war_orga" placeholder="Name der Orga" required>
+        </div>
+
+        <div class="form-group">
+            <label for="players">Spieler (3 Personen)</label>
+            <input type="text" id="players" name="players" placeholder="Spieler 1, Spieler 2, Spieler 3" required>
+        </div>
+
+        <div class="form-group">
+            <label for="substitutes">Ersatzspieler</label>
+            <input type="text" id="substitutes" name="substitutes" placeholder="Ersatz 1, Ersatz 2...">
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary" style="flex: 2;">✅ Bestätigen & im Kalender eintragen</button>
+            <a href="/admin/reset/{{ poll.id }}" class="btn btn-outline" style="flex: 1; text-align: center; color: #f44336; border-color: #f44336;">🔄 Neustarten</a>
+        </div>
+    </form>
+</div>
+
+<div class="card mt-1" style="max-width: 800px; margin-left: auto; margin-right: auto;">
+    <h3>Abstimmer für diesen Termin:</h3>
+    <p style="color: var(--text-muted);">{{ winner.voters|join(', ') }}</p>
+</div>
+{% endblock %}

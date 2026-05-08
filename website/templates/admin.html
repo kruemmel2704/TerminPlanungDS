@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <section class="mb-2">
+        <div class="card">
+            <h2>Neue Abstimmung erstellen</h2>
+            <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--glass-bg); border-radius: 8px;">
+                <strong>Google Kalender Status:</strong> 
+                {% if user.google_token %}
+                    <span style="color: #4caf50;">Verknüpft ✅</span>
+                {% else %}
+                    <span style="color: #f44336;">Nicht verknüpft ❌</span>
+                    <a href="/admin/connect-google" class="btn btn-outline" style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.8rem;">Jetzt verknüpfen</a>
+                {% endif %}
+            </div>
+            <form method="POST" class="mt-1">
+                <div class="form-group">
+                    <label for="title">Liga / Spiel Name</label>
+                    <input type="text" id="title" name="title" placeholder="z.B. Clan War vs. Team X" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Beschreibung (Optional)</label>
+                    <textarea id="description" name="description" rows="2" placeholder="Zusatzinfos..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="deadline">Abstimmungs-Deadline (Wann soll das Voting enden?)</label>
+                    <input type="datetime-local" id="deadline" name="deadline" required>
+                </div>
+                
+                <div id="options-container">
+                    <label>Terminvorschläge</label>
+                    <div class="option-entry mb-1" style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div style="flex: 2">
+                            <label style="font-size: 0.7rem;">Start</label>
+                            <input type="datetime-local" name="option_start[]" required>
+                        </div>
+                        <div style="flex: 2">
+                            <label style="font-size: 0.7rem;">Ende</label>
+                            <input type="datetime-local" name="option_end[]" required>
+                        </div>
+                        <button type="button" class="btn btn-outline remove-option" style="padding: 10px; color: #f44336; border-color: #f44336;">&times;</button>
+                    </div>
+                </div>
+                
+                <button type="button" id="add-option" class="btn btn-outline mb-1">+ Weiteren Termin hinzufügen</button>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Abstimmung starten</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="mb-2">
+        <div class="card">
+            <h2>Aktive Abstimmungen & Planung</h2>
+            <div class="polls-grid mt-1">
+                {% for poll in active_polls %}
+                <div class="poll-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h3>{{ poll.title }}</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">
+                                Status: 
+                                {% if poll.status == 'voting' %}
+                                    <span style="color: #4caf50;">Voting läuft...</span>
+                                {% elif poll.status == 'pending' %}
+                                    <span style="color: #ff9800;">Wartet auf Roster-Planung</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="actions" style="display: flex; gap: 0.5rem;">
+                            {% if poll.status == 'voting' %}
+                                <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Beenden & Roster</a>
+                            {% else %}
+                                <a href="/admin/confirm/{{ poll.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;">Roster Planen</a>
+                            {% endif %}
+                            <a href="/admin/reset/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; color: #f44336; border-color: #f44336;">Reset</a>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p style="color: var(--text-muted);">Keine aktiven Abstimmungen.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="card">
+            <h2>Abgeschlossene Spiele (Finalisiert)</h2>
+            <div class="polls-grid mt-1">
+                {% for poll in finished_polls %}
+                <div class="poll-card" style="border-left: 4px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between;">
+                        <h3>{{ poll.title }}</h3>
+                        <a href="/results/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Ergebnis</a>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Roster: {{ poll.players }}</p>
+                </div>
+                {% else %}
+                <p style="color: var(--text-muted);">Noch keine Spiele abgeschlossen.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    document.getElementById('add-option').addEventListener('click', () => {
+        const container = document.getElementById('options-container');
+        const newEntry = container.children[1].cloneNode(true);
+        newEntry.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newEntry);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-option')) {
+            const entries = document.querySelectorAll('.option-entry');
+            if (entries.length > 1) {
+                e.target.closest('.option-entry').remove();
+            }
+        }
+    });
+</script>
+{% endblock %}

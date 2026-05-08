@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Home - Liga Planer{% endblock %}
+
+{% block content %}
+<header class="text-center mb-2">
+    <h1>Aktive Abstimmungen</h1>
+    <p style="color: var(--text-muted)">Wähle eine Abstimmung aus, um deine Verfügbarkeit anzugeben.</p>
+</header>
+
+<div class="polls-list">
+    {% if polls %}
+        {% for poll in polls %}
+            <div class="card poll-card">
+                <div>
+                    <h2>{{ poll.title }}</h2>
+                    <p style="color: var(--text-muted)">Deadline: {{ poll.deadline.strftime('%d.%m.%Y %H:%M') }}</p>
+                </div>
+                <a href="/vote/{{ poll.id }}" class="btn btn-primary">Jetzt Abstimmen</a>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="card text-center">
+            <p>Aktuell keine aktiven Abstimmungen vorhanden.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

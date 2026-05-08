@@ -1,0 +1,17 @@
+{
+    "name": "Liga Termin Planer",
+    "short_name": "LigaPlaner",
+    "description": "Tool zur Terminfindung für Liga Spiele",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#800020",
+    "icons": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/3652/3652191.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
