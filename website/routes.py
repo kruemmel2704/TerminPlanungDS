@@ -24,8 +24,8 @@ def admin_dashboard():
         title = request.form.get('title')
         description = request.form.get('description')
         deadline_str = request.form.get('deadline')
-        option_starts = request.form.getlist('option_start[]')
-        option_ends = request.form.getlist('option_end[]')
+        option_starts = request.form.getlist('option_start')
+        option_ends = request.form.getlist('option_end')
 
         # Check if at least one option is fully filled
         valid_options = any(s and e for s, e in zip(option_starts, option_ends))

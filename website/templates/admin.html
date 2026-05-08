@@ -18,15 +18,15 @@
             <form method="POST" class="mt-1">
                 <div class="form-group">
                     <label for="title">Liga / Spiel Name</label>
-                    <input type="text" id="title" name="title" placeholder="z.B. Clan War vs. Team X" required>
+                    <input type="text" id="title" name="title" placeholder="z.B. Clan War vs. Team X" value="{{ request.form.get('title', '') }}" required>
                 </div>
                 <div class="form-group">
                     <label for="description">Beschreibung (Optional)</label>
-                    <textarea id="description" name="description" rows="2" placeholder="Zusatzinfos..."></textarea>
+                    <textarea id="description" name="description" rows="2" placeholder="Zusatzinfos...">{{ request.form.get('description', '') }}</textarea>
                 </div>
                 <div class="form-group">
                     <label for="deadline">Abstimmungs-Deadline (Wann soll das Voting enden?)</label>
-                    <input type="datetime-local" id="deadline" name="deadline" required>
+                    <input type="datetime-local" id="deadline" name="deadline" value="{{ request.form.get('deadline', '') }}" required>
                 </div>
                 
                 <div id="options-container">
@@ -34,11 +34,11 @@
                     <div class="option-entry mb-1" style="display: flex; gap: 10px; align-items: flex-end;">
                         <div style="flex: 2">
                             <label style="font-size: 0.7rem;">Start</label>
-                            <input type="datetime-local" name="option_start[]" required>
+                            <input type="datetime-local" name="option_start" required>
                         </div>
                         <div style="flex: 2">
                             <label style="font-size: 0.7rem;">Ende</label>
-                            <input type="datetime-local" name="option_end[]" required>
+                            <input type="datetime-local" name="option_end" required>
                         </div>
                         <button type="button" class="btn btn-outline remove-option" style="padding: 10px; color: #f44336; border-color: #f44336;">&times;</button>
                     </div>
