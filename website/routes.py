@@ -24,29 +24,34 @@ def admin_dashboard():
         title = request.form.get('title')
         description = request.form.get('description')
         deadline_str = request.form.get('deadline')
-        options_list = request.form.getlist('options_start[]')
-        options_end_list = request.form.getlist('options_end[]')
+        option_starts = request.form.getlist('option_start[]')
+        option_ends = request.form.getlist('option_end[]')
 
-        if not title or not deadline_str or not options_list:
-            flash('Bitte alle Felder ausfüllen!', category='error')
+        # Check if at least one option is fully filled
+        valid_options = any(s and e for s, e in zip(option_starts, option_ends))
+
+        if not title or not deadline_str or not valid_options:
+            flash('Bitte gib einen Titel, eine Deadline und mindestens einen vollständigen Terminvorschlag an!', category='error')
         else:
-            deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
-            new_poll = Poll(title=title, description=description, deadline=deadline)
-            db.session.add(new_poll)
-            db.session.flush() # Get ID
+            try:
+                deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
+                new_poll = Poll(title=title, description=description, deadline=deadline)
+                db.session.add(new_poll)
+                db.session.flush()
 
-            for start, end in zip(options_list, options_end_list):
-                if start and end:
-                    opt = Option(
-                        poll_id=new_poll.id, 
-                        start_time=datetime.strptime(start, '%Y-%m-%dT%H:%M'),
-                        end_time=datetime.strptime(end, '%Y-%m-%dT%H:%M')
-                    )
-                    db.session.add(opt)
-            
-            db.session.commit()
-            flash('Poll erstellt!', category='success')
-            return redirect(url_for('routes.admin_dashboard'))
+                for start, end in zip(option_starts, option_ends):
+                    if start and end:
+                        s_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M')
+                        e_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M')
+                        new_opt = Option(poll_id=new_poll.id, start_time=s_dt, end_time=e_dt)
+                        db.session.add(new_opt)
+                
+                db.session.commit()
+                flash('Abstimmung erfolgreich erstellt!', category='success')
+                return redirect(url_for('routes.admin_dashboard'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Fehler beim Speichern: {str(e)}', category='error')
 
     active_polls = Poll.query.filter_by(is_active=True).all()
     finished_polls = Poll.query.filter_by(is_active=False).all()
