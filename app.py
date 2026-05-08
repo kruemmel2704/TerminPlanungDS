@@ -16,4 +16,5 @@ if __name__ == '__main__':
     bot_thread.start()
     
     # Start Flask App
-    app.run(debug=True, use_reloader=False) # use_reloader=False prevents double bot startup
+    # host='0.0.0.0' erlaubt den Zugriff von anderen Geräten im Netzwerk/Internet
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
