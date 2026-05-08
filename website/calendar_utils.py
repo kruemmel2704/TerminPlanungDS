@@ -41,14 +41,14 @@ def create_league_calendar(user):
     
     return created_calendar['id']
 
-def add_event_to_calendar(user, option, title):
+def add_event_to_calendar(user, option, title, description=""):
     service = get_calendar_service(user)
     if not service or not user.google_calendar_id:
         return False
     
     event = {
         'summary': f'Spiel: {title}',
-        'description': 'Automatisch erstellt durch Liga Planer',
+        'description': description if description else 'Automatisch erstellt durch Liga Planer',
         'start': {
             'dateTime': option.start_time.isoformat(),
             'timeZone': 'Europe/Berlin',
