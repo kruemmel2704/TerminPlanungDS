@@ -60,20 +60,11 @@
                         <div>
                             <h3>{{ poll.title }}</h3>
                             <p style="font-size: 0.8rem; color: var(--text-muted);">
-                                Status: 
-                                {% if poll.status == 'voting' %}
-                                    <span style="color: #4caf50;">Voting läuft... ({{ poll.unique_voter_count }} Teilnehmer)</span>
-                                {% elif poll.status == 'pending' %}
-                                    <span style="color: #ff9800;">Wartet auf Roster-Planung</span>
-                                {% endif %}
+                                Status: <span style="color: #4caf50;">Voting läuft... ({{ poll.unique_voter_count }} Teilnehmer)</span>
                             </p>
                         </div>
                         <div class="actions" style="display: flex; gap: 0.5rem;">
-                            {% if poll.status == 'voting' %}
-                                <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Beenden & Roster</a>
-                            {% else %}
-                                <a href="/admin/confirm/{{ poll.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;">Roster Planen</a>
-                            {% endif %}
+                            <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Abstimmung Beenden</a>
                             <a href="/admin/reset/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; color: #f44336; border-color: #f44336;">Reset</a>
                         </div>
                     </div>
@@ -87,18 +78,31 @@
 
     <section>
         <div class="card">
-            <h2>Abgeschlossene Spiele (Finalisiert)</h2>
+            <h2>Abgeschlossene Events (Beendet / Finalisiert)</h2>
             <div class="polls-grid mt-1">
                 {% for poll in finished_polls %}
-                <div class="poll-card" style="border-left: 4px solid var(--primary);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <h3>{{ poll.title }}</h3>
-                        <a href="/results/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Ergebnis</a>
+                <div class="poll-card" style="border-left: 4px solid {% if poll.status == 'pending' %}#ff9800{% else %}var(--primary){% endif %};">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h3>{{ poll.title }}</h3>
+                            {% if poll.status == 'pending' %}
+                                <p style="font-size: 0.8rem; color: #ff9800; margin-top: 5px;">Zwischenschritt: Wartet auf Roster & Termin</p>
+                            {% else %}
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Status: Final Beendet</p>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Roster: {{ poll.players }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            {% if poll.status == 'pending' %}
+                                <a href="/admin/confirm/{{ poll.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;">Roster & Termin Planen</a>
+                            {% endif %}
+                            <a href="/results/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Ergebnis</a>
+                            <a href="/admin/reset/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; color: #f44336; border-color: #f44336;">Reset</a>
+                        </div>
                     </div>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Roster: {{ poll.players }}</p>
                 </div>
                 {% else %}
-                <p style="color: var(--text-muted);">Noch keine Spiele abgeschlossen.</p>
+                <p style="color: var(--text-muted);">Noch keine Events abgeschlossen.</p>
                 {% endfor %}
             </div>
         </div>
