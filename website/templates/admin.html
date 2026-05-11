@@ -59,11 +59,17 @@
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
                             <h3>{{ poll.title }}</h3>
-                            <p style="font-size: 0.8rem; color: var(--text-muted);">
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">
                                 Status: <span style="color: #4caf50;">Voting läuft... ({{ poll.unique_voter_count }} Teilnehmer)</span>
                             </p>
+                            {% if poll.unique_voter_names %}
+                            <p style="font-size: 0.75rem; color: var(--text-muted);">
+                                <strong>Gewotet haben:</strong> {{ poll.unique_voter_names | join(', ') }}
+                            </p>
+                            {% endif %}
                         </div>
-                        <div class="actions" style="display: flex; gap: 0.5rem;">
+                        <div class="actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <a href="/results/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Zwischenstand</a>
                             <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Abstimmung Beenden</a>
                             <a href="/admin/reset/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; color: #f44336; border-color: #f44336;">Reset</a>
                         </div>

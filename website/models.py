@@ -32,6 +32,11 @@ class Poll(db.Model):
     def unique_voter_count(self):
         return len(set(vote.user_id for option in self.options for vote in option.votes))
 
+    @property
+    def unique_voter_names(self):
+        voters = {vote.user_name for option in self.options for vote in option.votes}
+        return sorted(list(voters))
+
 class Option(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     poll_id = db.Column(db.Integer, db.ForeignKey('poll.id'), nullable=False)
