@@ -52,6 +52,12 @@ def share_poll(poll_id):
     
     poll = Poll.query.get_or_404(poll_id)
     
+    # Check if authorized
+    status_resp = wa_client.get_status()
+    if status_resp.get('stateInstance') != 'online':
+        flash('Bitte verbinde zuerst deinen WhatsApp Account!', category='warning')
+        return redirect(url_for('whatsapp.dashboard'))
+
     if request.method == 'POST':
         chat_id = request.form.get('chat_id')
         if not chat_id:

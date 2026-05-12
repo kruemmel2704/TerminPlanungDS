@@ -49,12 +49,28 @@ class WhatsAppClient:
         if not self.api:
             return []
         try:
-            # getGroupList returns a list of groups the instance is in
+            # First attempt: getGroupList (native groups)
             response = self.api.group.getGroupList()
-            if response.code == 200:
+            if response.code == 200 and isinstance(response.data, list) and len(response.data) > 0:
+                # Ensure the field names are consistent
+                for group in response.data:
+                    if 'groupName' not in group and 'name' in group:
+                        group['groupName'] = group['name']
                 return response.data
+            
+            # Fallback/Alternative: getContacts and filter for groups
+            response = self.api.service.getContacts()
+            if response.code == 200 and isinstance(response.data, list):
+                groups = [c for c in response.data if c.get('type') == 'group']
+                # Normalize field names
+                for g in groups:
+                    if 'groupName' not in g:
+                        g['groupName'] = g.get('name') or g.get('id')
+                return groups
+                
             return []
-        except Exception:
+        except Exception as e:
+            print(f"Error getting groups: {e}")
             return []
 
     def send_poll(self, chat_id, poll_name, options, multiple_answers=False):
