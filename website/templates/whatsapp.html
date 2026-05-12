@@ -8,7 +8,7 @@
 
     <div class="status-container" style="margin-top: 2rem; padding: 2rem; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); text-align: center;">
         <h3>Status: 
-            {% if status == 'online' %}
+            {% if status == 'online' or status == 'authorized' %}
                 <span style="color: #4ade80;">Verbunden ✅</span>
             {% elif status == 'notAuthorized' %}
                 <span style="color: #fbbf24;">Nicht autorisiert ⚠️</span>
@@ -28,7 +28,7 @@
                 <p style="margin-top: 1rem; font-size: 0.9rem;" class="text-muted">Der Code aktualisiert sich automatisch beim Neuladen der Seite.</p>
                 <button onclick="window.location.reload();" class="btn btn-outline" style="margin-top: 1rem;">Code aktualisieren</button>
             </div>
-        {% elif status == 'online' %}
+        {% elif status == 'online' or status == 'authorized' %}
             <div style="margin-top: 2rem;">
                 <p>Dein WhatsApp Account ist erfolgreich verknüpft.</p>
                 <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">

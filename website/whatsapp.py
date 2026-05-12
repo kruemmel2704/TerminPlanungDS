@@ -54,7 +54,8 @@ def share_poll(poll_id):
     
     # Check if authorized
     status_resp = wa_client.get_status()
-    if status_resp.get('stateInstance') != 'online':
+    state = status_resp.get('stateInstance')
+    if state not in ['online', 'authorized']:
         flash('Bitte verbinde zuerst deinen WhatsApp Account!', category='warning')
         return redirect(url_for('whatsapp.dashboard'))
 
