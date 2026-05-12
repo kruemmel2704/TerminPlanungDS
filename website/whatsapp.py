@@ -63,15 +63,23 @@ def share_poll(poll_id):
         chat_id = request.form.get('chat_id')
         if not chat_id:
             flash('Bitte wähle eine Gruppe aus!', category='error')
-        elif len(poll.options) < 2:
-            flash('Eine WhatsApp-Umfrage benötigt mindestens 2 Terminvorschläge!', category='error')
+        elif len(poll.options) == 0:
+            flash('Diese Abstimmung hat keine Terminvorschläge!', category='error')
         else:
-            options = [opt.start_time.strftime("%d.%m. %H:%M") for opt in poll.options]
-            poll_name = f"Abstimmung: {poll.title}"
+            # Handle single option case with Ja/Nein
+            if len(poll.options) == 1:
+                opt = poll.options[0]
+                options = ["Ja", "Nein"]
+                poll_name = f"Termin am {opt.start_time.strftime('%d.%m. %H:%M')}: {poll.title}"
+            else:
+                options = [opt.start_time.strftime("%d.%m. %H:%M") for opt in poll.options]
+                poll_name = f"Abstimmung: {poll.title}"
+            
             if poll.description:
                 poll_name += f"\n{poll.description}"
             
-            if wa_client.send_poll(chat_id, poll_name, options):
+            # multiple_answers=True as requested
+            if wa_client.send_poll(chat_id, poll_name, options, multiple_answers=True):
                 flash(f'Umfrage wurde erfolgreich an WhatsApp gesendet!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
             else:

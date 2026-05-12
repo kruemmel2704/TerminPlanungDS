@@ -78,11 +78,12 @@ class WhatsAppClient:
             formatted_options = [{"optionName": opt} for opt in options]
             
             # Use positional arguments: chatId, message (pollName), options
-            # The SDK expects: sendPoll(chatId, message, options)
+            # The SDK expects: sendPoll(chatId, message, options, multipleAnswers)
             response = self.api.sending.sendPoll(
                 chat_id,
                 poll_name,
-                formatted_options
+                formatted_options,
+                multipleAnswers=multiple_answers
             )
             return response.code == 200
         except Exception as e:
