@@ -74,13 +74,15 @@ class WhatsAppClient:
         if not self.api:
             return False
         try:
-            # options should be a list of objects like [{"optionName": "Option 1"}, ...]
+            # options must be a list of objects like [{"optionName": "Option 1"}, ...]
             formatted_options = [{"optionName": opt} for opt in options]
+            
+            # Use positional arguments: chatId, message (pollName), options
+            # The SDK expects: sendPoll(chatId, message, options)
             response = self.api.sending.sendPoll(
-                chatId=chat_id,
-                options=formatted_options,
-                pollName=poll_name,
-                multipleAnswers=multiple_answers
+                chat_id,
+                poll_name,
+                formatted_options
             )
             return response.code == 200
         except Exception as e:
