@@ -104,9 +104,9 @@ def manual_finalize(poll_id):
     poll = Poll.query.get_or_404(poll_id)
     if poll.status == 'voting':
         finalize_poll(poll)
-        flash(f'Abstimmung "{poll.title}" wurde beendet. Bitte jetzt Roster festlegen!', category='success')
+        flash(f'Abstimmung "{poll.title}" wurde beendet. Sie liegt nun unter "Abgeschlossene Events", wo du das Roster festlegen kannst!', category='success')
     
-    return redirect(url_for('routes.confirm_poll', poll_id=poll.id))
+    return redirect(url_for('routes.admin_dashboard'))
 
 @routes.route('/admin/confirm/<int:poll_id>', methods=['GET', 'POST'])
 @login_required
