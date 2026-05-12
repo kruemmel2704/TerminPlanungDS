@@ -66,6 +66,7 @@
                             <p style="font-size: 0.75rem; color: var(--text-muted);">
                                 <strong>Gewotet haben:</strong> {{ poll.unique_voter_names | join(', ') }}
                             </p>
+                            {% endif %}
                         </div>
                         <div class="actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                             {% if poll.status == 'voting' %}
