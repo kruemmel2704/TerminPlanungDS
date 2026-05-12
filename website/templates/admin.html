@@ -68,8 +68,9 @@
                                 {% endif %}
                             </p>
                         </div>
-                        <div class="actions" style="display: flex; gap: 0.5rem;">
+                        <div class="actions" style="display: flex; gap: 0.5rem; align-items: center;">
                             {% if poll.status == 'voting' %}
+                                <a href="/whatsapp/share/{{ poll.id }}" title="Auf WhatsApp teilen" style="text-decoration: none; font-size: 1.2rem; margin-right: 0.5rem;">📱</a>
                                 <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Beenden & Roster</a>
                             {% else %}
                                 <a href="/admin/confirm/{{ poll.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;">Roster Planen</a>

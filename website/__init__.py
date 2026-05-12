@@ -21,9 +21,11 @@ def create_app():
 
     from .routes import routes
     from .auth import auth
+    from .whatsapp import whatsapp
 
     app.register_blueprint(routes, url_prefix='/')
     app.register_blueprint(auth, url_prefix='/')
+    app.register_blueprint(whatsapp, url_prefix='/')
 
     from .models import User, Poll, Option, Vote
 

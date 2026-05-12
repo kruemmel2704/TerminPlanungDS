@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Umfrage teilen{% endblock %}
+
+{% block content %}
+<div class="card">
+    <a href="/admin" class="text-muted" style="text-decoration: none; font-size: 0.9rem;">← Zurück zum Dashboard</a>
+    <h1 style="margin-top: 1rem;">Umfrage auf WhatsApp teilen</h1>
+    <p>Wähle eine Gruppe aus, in der die Umfrage <strong>"{{ poll.title }}"</strong> gepostet werden soll.</p>
+
+    <div style="margin-top: 2rem;">
+        {% if groups %}
+            <form action="{{ url_for('whatsapp.share_poll', poll_id=poll.id) }}" method="POST">
+                <div class="group-list">
+                    <input type="text" id="groupSearch" placeholder="Gruppe suchen..." class="form-control" style="margin-bottom: 1.5rem; background: rgba(255,255,255,0.05);">
+                    
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                        {% for group in groups %}
+                            <label class="group-item">
+                                <input type="radio" name="chat_id" value="{{ group.id }}" required>
+                                <div class="group-info">
+                                    <span class="group-name">{{ group.groupName }}</span>
+                                    <span class="group-id">{{ group.id }}</span>
+                                </div>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn">Umfrage jetzt senden</button>
+                    <a href="/admin" class="btn btn-outline">Abbrechen</a>
+                </div>
+            </form>
+        {% else %}
+            <div style="padding: 2rem; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                <p>Keine WhatsApp Gruppen gefunden.</p>
+                <p class="text-muted" style="font-size: 0.9rem;">Stelle sicher, dass dein Handy verbunden ist und du in Gruppen bist.</p>
+                <a href="{{ url_for('whatsapp.dashboard') }}" class="btn btn-outline" style="margin-top: 1rem;">Verbindung prüfen</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .group-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .group-item:last-child {
+        border-bottom: none;
+    }
+    .group-item:hover {
+        background: rgba(255,255,255,0.05);
+    }
+    .group-item input[type="radio"] {
+        margin-right: 1.5rem;
+        accent-color: var(--accent-color);
+        width: 1.2rem;
+        height: 1.2rem;
+    }
+    .group-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .group-name {
+        font-weight: 600;
+        color: var(--text-color);
+    }
+    .group-id {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.8rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-family: inherit;
+    }
+</style>
+
+<script>
+    document.getElementById('groupSearch').addEventListener('input', function(e) {
+        const term = e.target.value.toLowerCase();
+        const items = document.querySelectorAll('.group-item');
+        
+        items.forEach(item => {
+            const name = item.querySelector('.group-name').textContent.toLowerCase();
+            if (name.includes(term)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

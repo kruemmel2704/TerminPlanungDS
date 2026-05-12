@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Verbindung{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>WhatsApp Verbindung</h1>
+    <p class="text-muted">Verbinde deinen WhatsApp Account, um Umfragen direkt in deine Gruppen zu senden.</p>
+
+    <div class="status-container" style="margin-top: 2rem; padding: 2rem; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); text-align: center;">
+        <h3>Status: 
+            {% if status == 'online' %}
+                <span style="color: #4ade80;">Verbunden ✅</span>
+            {% elif status == 'notAuthorized' %}
+                <span style="color: #fbbf24;">Nicht autorisiert ⚠️</span>
+            {% elif status == 'unconfigured' %}
+                <span style="color: #f87171;">Nicht konfiguriert ❌</span>
+            {% else %}
+                <span style="color: var(--text-muted);">{{ status }}</span>
+            {% endif %}
+        </h3>
+
+        {% if status == 'notAuthorized' and qr_data %}
+            <div style="margin-top: 2rem;">
+                <p>Scanne diesen QR-Code mit deinem Handy (WhatsApp > Verknüpfte Geräte):</p>
+                <div style="background: white; padding: 1rem; display: inline-block; border-radius: 8px; margin-top: 1rem;">
+                    <img src="data:image/png;base64,{{ qr_data }}" alt="WhatsApp QR Code" style="width: 256px; height: 256px;">
+                </div>
+                <p style="margin-top: 1rem; font-size: 0.9rem;" class="text-muted">Der Code aktualisiert sich automatisch beim Neuladen der Seite.</p>
+                <button onclick="window.location.reload();" class="btn btn-outline" style="margin-top: 1rem;">Code aktualisieren</button>
+            </div>
+        {% elif status == 'online' %}
+            <div style="margin-top: 2rem;">
+                <p>Dein WhatsApp Account ist erfolgreich verknüpft.</p>
+                <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">
+                    <a href="/admin" class="btn">Zurück zum Admin-Dashboard</a>
+                    <a href="{{ url_for('whatsapp.logout') }}" class="btn btn-outline" style="border-color: #f87171; color: #f87171;">Abmelden</a>
+                </div>
+            </div>
+        {% elif status == 'unconfigured' %}
+            <div style="margin-top: 2rem; text-align: left;">
+                <p>Bitte trage deine <strong>GREEN_API_ID</strong> und <strong>GREEN_API_TOKEN</strong> in die <code>.env</code> Datei ein.</p>
+                <ol style="margin-top: 1rem; color: var(--text-muted);">
+                    <li>Gehe auf <a href="https://green-api.com" target="_blank">Green-API.com</a></li>
+                    <li>Erstelle einen kostenlosen Account</li>
+                    <li>Erstelle eine Instanz</li>
+                    <li>Kopiere die ID und den Token in deine <code>.env</code></li>
+                    <li>Starte die App neu</li>
+                </ol>
+            </div>
+        {% else %}
+            <p style="margin-top: 1rem;">Bitte warte einen Moment oder lade die Seite neu...</p>
+            <button onclick="window.location.reload();" class="btn btn-outline" style="margin-top: 1rem;">Aktualisieren</button>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .status-container h3 {
+        margin: 0;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
