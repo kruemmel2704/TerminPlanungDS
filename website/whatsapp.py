@@ -63,6 +63,8 @@ def share_poll(poll_id):
         chat_id = request.form.get('chat_id')
         if not chat_id:
             flash('Bitte wähle eine Gruppe aus!', category='error')
+        elif len(poll.options) < 2:
+            flash('Eine WhatsApp-Umfrage benötigt mindestens 2 Terminvorschläge!', category='error')
         else:
             options = [opt.start_time.strftime("%d.%m. %H:%M") for opt in poll.options]
             poll_name = f"Abstimmung: {poll.title}"
