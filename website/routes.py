@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from .models import Poll, Option, Vote, User
 from . import db
 from .calendar_utils import create_league_calendar, add_event_to_calendar
+from .whatsapp import wa_client
 from datetime import datetime
 
 routes = Blueprint('routes', __name__)
@@ -47,6 +48,16 @@ def admin_dashboard():
                         db.session.add(new_opt)
                 
                 db.session.commit()
+                
+                # WhatsApp Push Notification
+                if current_user.whatsapp_chat_id:
+                    vote_url = url_for('routes.vote', poll_id=new_poll.id, _external=True)
+                    push_msg = f"🚀 *Neue Abstimmung gestartet: {new_poll.title}*\n\n"
+                    if new_poll.description:
+                        push_msg += f"{new_poll.description}\n\n"
+                    push_msg += f"Bitte hier abstimmen:\n{vote_url}"
+                    wa_client.send_message(current_user.whatsapp_chat_id, push_msg)
+
                 flash('Abstimmung erfolgreich erstellt!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
             except Exception as e:

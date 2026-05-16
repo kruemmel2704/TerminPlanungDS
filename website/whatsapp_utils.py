@@ -70,6 +70,16 @@ class WhatsAppClient:
             print(f"Error getting groups: {e}")
             return []
 
+    def send_message(self, chat_id, text):
+        if not self.api:
+            return False
+        try:
+            response = self.api.sending.sendMessage(chat_id, text)
+            return response.code == 200
+        except Exception as e:
+            print(f"Error sending message: {e}")
+            return False
+
     def send_poll(self, chat_id, poll_name, options, multiple_answers=False):
         if not self.api:
             return False
