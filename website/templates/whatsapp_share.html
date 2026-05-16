@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Umfrage teilen{% endblock %}
+{% block title %}Reminder senden{% endblock %}
 
 {% block content %}
 <div class="card">
     <a href="/admin" class="text-muted" style="text-decoration: none; font-size: 0.9rem;">← Zurück zum Dashboard</a>
-    <h1 style="margin-top: 1rem;">Umfrage auf WhatsApp teilen</h1>
-    <p>Wähle eine Gruppe aus, in der die Umfrage <strong>"{{ poll.title }}"</strong> gepostet werden soll.</p>
+    <h1 style="margin-top: 1rem;">WhatsApp Reminder senden</h1>
+    <p>Wähle eine Gruppe aus, in der ein Reminder für die Abstimmung <strong>"{{ poll.title }}"</strong> gepostet werden soll.</p>
 
     <div style="margin-top: 2rem;">
         {% if groups %}
@@ -27,7 +27,7 @@
                 </div>
 
                 <div style="margin-top: 2rem; display: flex; gap: 1rem;">
-                    <button type="submit" class="btn">Umfrage jetzt senden</button>
+                    <button type="submit" class="btn">Reminder jetzt senden</button>
                     <a href="/admin" class="btn btn-outline">Abbrechen</a>
                 </div>
             </form>

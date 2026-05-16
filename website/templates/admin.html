@@ -70,7 +70,7 @@
                         </div>
                         <div class="actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                             {% if poll.status == 'voting' %}
-                                <a href="/whatsapp/share/{{ poll.id }}" title="Auf WhatsApp teilen" style="text-decoration: none; font-size: 1.2rem; margin-right: 0.5rem;">📱</a>
+                                <a href="/whatsapp/share/{{ poll.id }}" title="WhatsApp Reminder senden" style="text-decoration: none; font-size: 1.2rem; margin-right: 0.5rem;">📱</a>
                                 <a href="/results/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Zwischenstand</a>
                                 <a href="/admin/finalize/{{ poll.id }}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem; background: var(--primary);">Abstimmung Beenden</a>
                             {% else %}
