@@ -1,6 +1,7 @@
 import json
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from google.auth.exceptions import RefreshError
 from .models import Poll, Option
 from . import db
 
@@ -30,16 +31,25 @@ def create_league_calendar(user):
         'timeZone': 'Europe/Berlin'
     }
     
-    created_calendar = service.calendars().insert(body=calendar).execute()
-    
-    # Make calendar public
-    rule = {
-        'scope': {'type': 'default'},
-        'role': 'reader'
-    }
-    service.acl().insert(calendarId=created_calendar['id'], body=rule).execute()
-    
-    return created_calendar['id']
+    try:
+        created_calendar = service.calendars().insert(body=calendar).execute()
+        
+        # Make calendar public
+        rule = {
+            'scope': {'type': 'default'},
+            'role': 'reader'
+        }
+        service.acl().insert(calendarId=created_calendar['id'], body=rule).execute()
+        
+        return created_calendar['id']
+    except RefreshError:
+        user.google_token = None
+        user.google_calendar_id = None
+        db.session.commit()
+        return None
+    except Exception as e:
+        print(f"Calendar creation failed: {e}")
+        return None
 
 def add_event_to_calendar(user, option, title, description=""):
     service = get_calendar_service(user)
@@ -66,5 +76,14 @@ def add_event_to_calendar(user, option, title, description=""):
         },
     }
     
-    service.events().insert(calendarId=user.google_calendar_id, body=event).execute()
-    return True
+    try:
+        service.events().insert(calendarId=user.google_calendar_id, body=event).execute()
+        return True
+    except RefreshError:
+        user.google_token = None
+        user.google_calendar_id = None
+        db.session.commit()
+        return False
+    except Exception as e:
+        print(f"Event addition failed: {e}")
+        return False

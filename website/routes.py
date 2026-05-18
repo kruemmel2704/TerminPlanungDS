@@ -151,11 +151,16 @@ def confirm_poll(poll_id):
         
         # Google Calendar Integration
         admin = User.query.filter_by(is_admin=True).first()
+        calendar_success = False
+        calendar_attempted = False
+        
         if admin and admin.google_token:
+            calendar_attempted = True
             if not admin.google_calendar_id:
                 cal_id = create_league_calendar(admin)
-                admin.google_calendar_id = cal_id
-                db.session.commit()
+                if cal_id:
+                    admin.google_calendar_id = cal_id
+                    db.session.commit()
             
             if admin.google_calendar_id:
                 # Create a temporary option object for the calendar utility
@@ -164,10 +169,17 @@ def confirm_poll(poll_id):
                 temp_opt = TempOpt(start_time=final_start, end_time=final_end)
                 
                 roster_desc = f"🛡️ War Orga: {poll.war_orga}\n⚔️ Spieler: {poll.players}\n🔄 Ersatz: {poll.substitutes}"
-                add_event_to_calendar(admin, temp_opt, f"{poll.title} - FINAL", roster_desc)
+                calendar_success = add_event_to_calendar(admin, temp_opt, f"{poll.title} - FINAL", roster_desc)
         
         db.session.commit()
-        flash('Termin wurde final bestätigt und im Kalender eingetragen!', category='success')
+        
+        if calendar_attempted and not calendar_success:
+            flash('Termin wurde final bestätigt, ABER das Eintragen in den Kalender ist fehlgeschlagen (Google-Token abgelaufen?). Bitte erneut in den Einstellungen anmelden.', category='warning')
+        elif calendar_success:
+            flash('Termin wurde final bestätigt und im Kalender eingetragen!', category='success')
+        else:
+            flash('Termin wurde final bestätigt!', category='success')
+            
         return redirect(url_for('routes.results', poll_id=poll.id))
 
     return render_template("confirm_poll.html", poll=poll, winner=winner, user=current_user)
