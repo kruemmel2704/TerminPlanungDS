@@ -34,7 +34,14 @@ class Poll(db.Model):
 
     @property
     def unique_voter_count(self):
-        return len(set(vote.user_id for option in self.options for vote in option.votes))
+        voters = set()
+        for option in self.options:
+            for vote in option.votes:
+                if vote.is_whatsapp:
+                    voters.add(vote.whatsapp_sender)
+                else:
+                    voters.add(vote.user_id)
+        return len(voters)
 
     @property
     def unique_voter_names(self):

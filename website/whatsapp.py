@@ -222,32 +222,4 @@ def webhook():
                 
     return jsonify({"status": "ignored"}), 200
 
-@whatsapp.route('/whatsapp/simulate_webhook', methods=['POST'])
-@login_required
-def simulate_webhook():
-    if not current_user.is_admin:
-        return jsonify({"status": "error", "message": "Kein Zugriff"}), 403
-        
-    data = request.json or {}
-    poll_id = data.get('poll_id')
-    voter_name = data.get('voter_name', 'Test-User')
-    selected_option_strs = data.get('selected_options', [])
-    
-    poll = Poll.query.get_or_404(poll_id)
-    if not poll.whatsapp_poll_id:
-        poll.whatsapp_poll_id = f"mock_poll_{poll.id}"
-        db.session.commit()
-        
-    voter_slug = "".join([c if c.isalnum() else "_" for c in voter_name.lower()])
-    fake_sender = f"{voter_slug}@mock.us"
-    
-    success = process_whatsapp_vote(
-        poll_message_id=poll.whatsapp_poll_id,
-        sender_jid=fake_sender,
-        selected_options=selected_option_strs,
-        display_name_override=voter_name
-    )
-    
-    if success:
-        return jsonify({"status": "success", "message": f"Stimme für {voter_name} erfolgreich simuliert!"}), 200
-    return jsonify({"status": "error", "message": "Simulation failed"}), 500
+

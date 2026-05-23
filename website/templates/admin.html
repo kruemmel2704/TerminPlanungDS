@@ -108,35 +108,7 @@
                         </div>
                     </div>
 
-                    {% if poll.status == 'voting' and poll.whatsapp_poll_id %}
-                    <div class="whatsapp-simulator" style="margin-top: 1.5rem; padding: 1.2rem; background: rgba(37, 211, 102, 0.04); border: 1px dashed rgba(37, 211, 102, 0.3); border-radius: 8px;">
-                        <h4 style="color: #25d366; margin: 0 0 0.4rem 0; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size: 1.2rem;">📱</span> WhatsApp-Voting Simulator
-                        </h4>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 1rem 0;">Simuliere das Abstimmungsverhalten eines Spielers in WhatsApp:</p>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="text" id="sim-voter-{{ poll.id }}" placeholder="WhatsApp Name (z.B. Tom)" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #fff; font-size: 0.85rem; height: 36px;">
-                                <button type="button" onclick="simulateWhatsAppVote({{ poll.id }})" class="btn" style="background: #25d366; color: #fff; border: none; padding: 0 16px; font-size: 0.85rem; height: 36px; border-radius: 6px; cursor: pointer; font-weight: bold;">Simulieren</button>
-                            </div>
-                            
-                            <div style="background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
-                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold; display: block; margin-bottom: 0.5rem;">Termine auswählen:</span>
-                                <div style="display: flex; flex-direction: column; gap: 6px;">
-                                    {% for option in poll.options %}
-                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 0.8rem; cursor: pointer; padding: 2px 0;">
-                                        <input type="checkbox" name="sim_options_{{ poll.id }}" value="{{ format_option_for_whatsapp(option) }}" style="accent-color: #25d366;">
-                                        <span>
-                                            <strong>{{ option.start_time.strftime('%d.%m.%Y') }}</strong> ({{ option.start_time.strftime('%H:%M') }})
-                                        </span>
-                                    </label>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
+
                 </div>
                 {% else %}
                 <p style="color: var(--text-muted);">Keine aktiven Abstimmungen.</p>
@@ -241,41 +213,6 @@
         }
     });
 
-    function simulateWhatsAppVote(pollId) {
-        const voterNameInput = document.getElementById('sim-voter-' + pollId);
-        const voterName = voterNameInput.value.trim();
-        if (!voterName) {
-            alert('Bitte gib einen Namen für den Wähler an!');
-            return;
-        }
 
-        const checkboxes = document.querySelectorAll(`input[name="sim_options_${pollId}"]:checked`);
-        const selectedOptions = Array.from(checkboxes).map(cb => cb.value);
-
-        fetch('/whatsapp/simulate_webhook', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                poll_id: pollId,
-                voter_name: voterName,
-                selected_options: selectedOptions
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
-                window.location.reload();
-            } else {
-                alert('Fehler bei der Simulation: ' + data.message);
-            }
-        })
-        .catch(err => {
-            console.error('Error:', err);
-            alert('Netzwerkfehler bei der Simulation.');
-        });
-    }
 </script>
 {% endblock %}
