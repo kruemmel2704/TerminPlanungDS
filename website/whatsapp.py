@@ -15,7 +15,7 @@ def dashboard():
         return redirect(url_for('routes.home'))
     
     if not wa_client.is_configured():
-        flash('Green-API ist noch nicht in der .env konfiguriert!', category='warning')
+        flash('WhatsApp-API ist noch nicht in der .env konfiguriert!', category='warning')
         return render_template("whatsapp.html", status="unconfigured", user=current_user)
 
     state_resp = wa_client.get_status()
