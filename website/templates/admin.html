@@ -29,22 +29,36 @@
                     <input type="datetime-local" id="deadline" name="deadline" value="{{ request.form.get('deadline', '') }}" required>
                 </div>
                 
-                <div id="options-container">
-                    <label>Terminvorschläge</label>
-                    <div class="option-entry mb-1" style="display: flex; gap: 10px; align-items: flex-end;">
-                        <div style="flex: 2">
-                            <label style="font-size: 0.7rem;">Start</label>
-                            <input type="datetime-local" name="option_start" required>
-                        </div>
-                        <div style="flex: 2">
-                            <label style="font-size: 0.7rem;">Ende</label>
-                            <input type="datetime-local" name="option_end" required>
-                        </div>
-                        <button type="button" class="btn btn-outline remove-option" style="padding: 10px; color: #f44336; border-color: #f44336;">&times;</button>
+                <input type="hidden" id="poll_type" name="poll_type" value="single">
+                <div class="form-group">
+                    <label>Termin-Typ</label>
+                    <div class="type-selector">
+                        <div class="type-btn active" id="btn-single" onclick="setPollType('single')">Einzel-Termin (TCW)</div>
+                        <div class="type-btn" id="btn-liga" onclick="setPollType('liga')">Liga-Termin (5 Tage)</div>
                     </div>
                 </div>
-                
-                <button type="button" id="add-option" class="btn btn-outline mb-1">+ Weiteren Termin hinzufügen</button>
+
+                <!-- Einzel-Termin (TCW) Sektion -->
+                <div id="section-single" class="type-section">
+                    <label style="margin-bottom: 0.5rem; display: block; color: var(--text-muted);">Terminvorschläge (Jeweils 20:30 - 21:30 Uhr)</label>
+                    <div id="single-options-container" class="mt-1">
+                        <div class="option-entry mb-1" style="display: flex; gap: 10px; align-items: center;">
+                            <div style="flex: 1">
+                                <input type="date" name="single_date" required>
+                            </div>
+                            <button type="button" class="btn btn-outline remove-option" style="padding: 10px; height: 48px; width: 48px; display: flex; align-items: center; justify-content: center; color: #f44336; border-color: #f44336; font-size: 1.5rem;">&times;</button>
+                        </div>
+                    </div>
+                    <button type="button" id="add-single-option" class="btn btn-outline mb-1" style="width: 100%;">+ Weiteren Tag hinzufügen</button>
+                </div>
+
+                <!-- Liga-Termin Sektion -->
+                <div id="section-liga" class="type-section" style="display: none;">
+                    <div class="form-group">
+                        <label for="liga_start_date">Startdatum (Erstellt 5 aufeinanderfolgende Tage jeweils 20:30 - 21:30 Uhr)</label>
+                        <input type="date" id="liga_start_date" name="liga_start_date">
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Abstimmung starten</button>
             </form>
         </div>
@@ -58,7 +72,14 @@
                 <div class="poll-card">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
-                            <h3>{{ poll.title }}</h3>
+                            <h3>
+                                {{ poll.title }}
+                                {% if poll.poll_type == 'liga' %}
+                                    <span class="badge badge-liga" style="margin-left: 10px; vertical-align: middle;">Liga</span>
+                                {% else %}
+                                    <span class="badge badge-tcw" style="margin-left: 10px; vertical-align: middle;">TCW</span>
+                                {% endif %}
+                            </h3>
                             <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">
                                 Status: <span style="color: #4caf50;">Voting läuft... ({{ poll.unique_voter_count }} Teilnehmer)</span>
                             </p>
@@ -95,7 +116,14 @@
                 <div class="poll-card" style="border-left: 4px solid {% if poll.status == 'pending' %}#ff9800{% else %}var(--primary){% endif %};">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
-                            <h3>{{ poll.title }}</h3>
+                            <h3>
+                                {{ poll.title }}
+                                {% if poll.poll_type == 'liga' %}
+                                    <span class="badge badge-liga" style="margin-left: 10px; vertical-align: middle;">Liga</span>
+                                {% else %}
+                                    <span class="badge badge-tcw" style="margin-left: 10px; vertical-align: middle;">TCW</span>
+                                {% endif %}
+                            </h3>
                             {% if poll.status == 'pending' %}
                                 <p style="font-size: 0.8rem; color: #ff9800; margin-top: 5px;">Zwischenschritt: Wartet auf Roster & Termin</p>
                             {% else %}
@@ -121,18 +149,57 @@
 </div>
 
 <script>
-    document.getElementById('add-option').addEventListener('click', () => {
-        const container = document.getElementById('options-container');
-        const newEntry = container.children[1].cloneNode(true);
-        newEntry.querySelectorAll('input').forEach(input => input.value = '');
-        container.appendChild(newEntry);
+    function setPollType(type) {
+        document.getElementById('poll_type').value = type;
+        
+        const btnSingle = document.getElementById('btn-single');
+        const btnLiga = document.getElementById('btn-liga');
+        const secSingle = document.getElementById('section-single');
+        const secLiga = document.getElementById('section-liga');
+        
+        const singleInputs = secSingle.querySelectorAll('input[name="single_date"]');
+        const ligaInput = document.getElementById('liga_start_date');
+
+        if (type === 'liga') {
+            btnLiga.classList.add('active');
+            btnSingle.classList.remove('active');
+            secLiga.style.display = 'block';
+            secSingle.style.display = 'none';
+            
+            ligaInput.required = true;
+            singleInputs.forEach(i => i.required = false);
+        } else {
+            btnSingle.classList.add('active');
+            btnLiga.classList.remove('active');
+            secSingle.style.display = 'block';
+            secLiga.style.display = 'none';
+            
+            ligaInput.required = false;
+            singleInputs.forEach(i => i.required = true);
+        }
+    }
+
+    document.getElementById('add-single-option').addEventListener('click', () => {
+        const container = document.getElementById('single-options-container');
+        const entries = container.querySelectorAll('.option-entry');
+        if (entries.length > 0) {
+            const newEntry = entries[0].cloneNode(true);
+            const input = newEntry.querySelector('input');
+            input.value = '';
+            const isLigaActive = document.getElementById('poll_type').value === 'liga';
+            input.required = !isLigaActive;
+            container.appendChild(newEntry);
+        }
     });
 
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-option')) {
-            const entries = document.querySelectorAll('.option-entry');
+        if (e.target.classList.contains('remove-option') || e.target.closest('.remove-option')) {
+            const button = e.target.classList.contains('remove-option') ? e.target : e.target.closest('.remove-option');
+            const entries = document.querySelectorAll('#single-options-container .option-entry');
             if (entries.length > 1) {
-                e.target.closest('.option-entry').remove();
+                button.closest('.option-entry').remove();
+            } else {
+                alert('Mindestens ein Termin wird benötigt.');
             }
         }
     });

@@ -41,6 +41,19 @@ def migrate():
                 else:
                     print(f"Error adding {col_name}: {e}")
 
+        # Add poll_type to poll table
+        try:
+            print("Adding column poll_type to poll table...")
+            db.session.execute(text("ALTER TABLE poll ADD COLUMN poll_type VARCHAR(50) DEFAULT 'single'"))
+            db.session.commit()
+            print("Successfully added poll_type column to poll table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column poll_type already exists in poll table.")
+            else:
+                print(f"Error adding poll_type column to poll table: {e}")
+
 if __name__ == "__main__":
     migrate()
     print("Migration attempt finished.")
