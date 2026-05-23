@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
-from .whatsapp_utils import WhatsAppClient
+from .whatsapp_utils import WhatsAppClient, normalize_id
 from .models import Poll, Option, Vote, User
 from . import db
 
@@ -113,6 +113,8 @@ def format_option_for_whatsapp(option):
     return f"{day_name}. {option.start_time.strftime('%d.%m.%Y (%H:%M)')}"
 
 def process_whatsapp_vote(poll_message_id, sender_jid, selected_options, display_name_override=None):
+    poll_message_id = normalize_id(poll_message_id)
+    sender_jid = normalize_id(sender_jid)
     poll = Poll.query.filter_by(whatsapp_poll_id=poll_message_id).first()
     if not poll:
         print(f"No poll found with whatsapp_poll_id={poll_message_id}")
@@ -190,7 +192,7 @@ def send_poll_view(poll_id):
                 
             response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=True)
             if response and response.get('id'):
-                poll.whatsapp_poll_id = response.get('id')
+                poll.whatsapp_poll_id = normalize_id(response.get('id'))
                 db.session.commit()
                 flash(f'WhatsApp-Umfrage wurde erfolgreich gestartet!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
