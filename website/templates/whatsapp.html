@@ -78,13 +78,11 @@
                 </script>
         {% elif status == 'unconfigured' %}
             <div style="margin-top: 2rem; text-align: left;">
-                <p>Bitte trage deine <strong>GREEN_API_ID</strong> und <strong>GREEN_API_TOKEN</strong> in die <code>.env</code> Datei ein.</p>
+                <p>Bitte trage deine <strong>WHATSAPP_API_URL</strong> und optional <strong>WHATSAPP_API_KEY</strong> in die <code>.env</code> Datei ein.</p>
                 <ol style="margin-top: 1rem; color: var(--text-muted);">
-                    <li>Gehe auf <a href="https://green-api.com" target="_blank">Green-API.com</a></li>
-                    <li>Erstelle einen kostenlosen Account</li>
-                    <li>Erstelle eine Instanz</li>
-                    <li>Kopiere die ID und den Token in deine <code>.env</code></li>
-                    <li>Starte die App neu</li>
+                    <li>Stelle sicher, dass der WAHA-Docker-Container läuft.</li>
+                    <li>Trage die API-URL (z.B. <code>http://waha:3000</code>) in deine <code>.env</code> ein.</li>
+                    <li>Starte die App neu.</li>
                 </ol>
             </div>
         {% else %}

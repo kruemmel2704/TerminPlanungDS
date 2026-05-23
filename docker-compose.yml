@@ -27,6 +27,7 @@ services:
       - ./.sessions:/app/.sessions
     environment:
       - WAHA_PRINT_QR=true
+      - WAHA_API_KEY=${WHATSAPP_API_KEY}
     networks:
       - app-network
 
