@@ -184,23 +184,39 @@ def confirm_poll(poll_id):
 
     return render_template("confirm_poll.html", poll=poll, winner=winner, user=current_user)
 
-@routes.route('/admin/reset/<int:poll_id>')
+@routes.route('/admin/reset/<int:poll_id>', methods=['GET', 'POST'])
 @login_required
 def reset_poll(poll_id):
     if not current_user.is_admin:
         return redirect(url_for('routes.home'))
     
     poll = Poll.query.get_or_404(poll_id)
-    poll.status = 'voting'
-    poll.is_active = True
-    poll.winner_option_id = None
-    # Delete previous votes? User might want to keep them or wipe. Usually reset means wipe.
-    for opt in poll.options:
-        Vote.query.filter_by(option_id=opt.id).delete()
-        
-    db.session.commit()
-    flash('Abstimmung wurde zurückgesetzt und neu gestartet!', category='success')
-    return redirect(url_for('routes.admin_dashboard'))
+    
+    if request.method == 'POST':
+        new_deadline_str = request.form.get('deadline')
+        if not new_deadline_str:
+            flash('Bitte gib eine gültige neue Deadline an!', category='error')
+            return redirect(url_for('routes.reset_poll', poll_id=poll.id))
+            
+        try:
+            new_deadline = datetime.strptime(new_deadline_str, '%Y-%m-%dT%H:%M')
+            poll.deadline = new_deadline
+            poll.status = 'voting'
+            poll.is_active = True
+            poll.winner_option_id = None
+            
+            # Delete previous votes
+            for opt in poll.options:
+                Vote.query.filter_by(option_id=opt.id).delete()
+                
+            db.session.commit()
+            flash('Abstimmung wurde erfolgreich mit neuer Deadline zurückgesetzt und gestartet!', category='success')
+            return redirect(url_for('routes.admin_dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler beim Zurücksetzen: {str(e)}', category='error')
+            
+    return render_template('reset_poll.html', poll=poll, user=current_user)
 
 @routes.route('/results/<int:poll_id>')
 @login_required
