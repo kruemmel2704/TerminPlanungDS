@@ -35,10 +35,68 @@ fi
 echo "Installing Python dependencies..."
 .venv/bin/pip install -r requirements.txt
 
-if [ ! -f ".env" ] && [ -f ".env.template" ]; then
-    echo "Copying .env.template to .env..."
-    cp .env.template .env
-    echo "NOTE: Please fill out the .env file with your specific credentials."
+if [ ! -f ".env" ]; then
+    echo ""
+    echo "======================================"
+    echo "Konfiguration der .env Datei"
+    echo "Eingabetaste (Enter) drücken, um den Standardwert zu nutzen."
+    echo "======================================"
+    
+    # Generate a default secret key
+    DEFAULT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(24))' 2>/dev/null || echo "your_secret_key_here")
+    
+    read -p "FLASK_ENV [development]: " FLASK_ENV
+    FLASK_ENV=${FLASK_ENV:-development}
+    
+    read -p "SECRET_KEY [$DEFAULT_SECRET]: " SECRET_KEY
+    SECRET_KEY=${SECRET_KEY:-$DEFAULT_SECRET}
+    
+    read -p "DATABASE_URL [sqlite:///database.db]: " DATABASE_URL
+    DATABASE_URL=${DATABASE_URL:-sqlite:///database.db}
+    
+    echo ""
+    echo "--- Discord Settings ---"
+    read -p "DISCORD_CLIENT_ID: " DISCORD_CLIENT_ID
+    read -p "DISCORD_CLIENT_SECRET: " DISCORD_CLIENT_SECRET
+    read -p "DISCORD_REDIRECT_URI [http://localhost:5000/callback/discord]: " DISCORD_REDIRECT_URI
+    DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI:-http://localhost:5000/callback/discord}
+    read -p "DISCORD_BOT_TOKEN: " DISCORD_BOT_TOKEN
+    read -p "DISCORD_GUILD_ID: " DISCORD_GUILD_ID
+    read -p "DISCORD_ADMIN_ROLE_ID: " DISCORD_ADMIN_ROLE_ID
+    read -p "DISCORD_USER_ROLE_ID (optional): " DISCORD_USER_ROLE_ID
+    
+    echo ""
+    echo "--- Google Settings ---"
+    read -p "GOOGLE_CLIENT_ID: " GOOGLE_CLIENT_ID
+    read -p "GOOGLE_CLIENT_SECRET: " GOOGLE_CLIENT_SECRET
+    GOOGLE_DISCOVERY_URL="https://accounts.google.com/.well-known/openid-configuration"
+
+    echo "Erstelle .env Datei..."
+    cat > .env <<EOF
+FLASK_APP=app.py
+FLASK_ENV=$FLASK_ENV
+SECRET_KEY=$SECRET_KEY
+DATABASE_URL=$DATABASE_URL
+
+# Discord OAuth
+DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID
+DISCORD_CLIENT_SECRET=$DISCORD_CLIENT_SECRET
+DISCORD_REDIRECT_URI=$DISCORD_REDIRECT_URI
+DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
+
+# Discord Server Gating
+DISCORD_GUILD_ID=$DISCORD_GUILD_ID
+DISCORD_ADMIN_ROLE_ID=$DISCORD_ADMIN_ROLE_ID
+DISCORD_USER_ROLE_ID=$DISCORD_USER_ROLE_ID
+
+# Google OAuth (Admin Calendar Only)
+GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+GOOGLE_DISCOVERY_URL=$GOOGLE_DISCOVERY_URL
+EOF
+    echo ".env Datei erfolgreich erstellt!"
+else
+    echo ".env existiert bereits. Konfiguration übersprungen."
 fi
 
 echo "Installation complete!"
