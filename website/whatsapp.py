@@ -150,7 +150,7 @@ def process_whatsapp_vote(poll_message_id, sender_jid, selected_options, display
     db.session.commit()
     
     for opt in options:
-        opt_str = format_option_for_whatsapp(opt)
+        opt_str = format_option_for_whatsapp(opt).strip()
         if opt_str in selected_options:
             new_vote = Vote(
                 option_id=opt.id,
@@ -209,9 +209,40 @@ def webhook():
     event = data.get('event')
     if event == 'poll.vote':
         payload = data.get('payload', {})
-        poll_message_id = payload.get('pollMessageId')
-        sender = payload.get('sender')
-        selected_options = payload.get('selectedOptions', [])
+        
+        # Robustly extract poll message ID
+        poll_message_id = (
+            payload.get('pollMessageId') or 
+            payload.get('poll', {}).get('id') or 
+            payload.get('vote', {}).get('pollId') or 
+            payload.get('vote', {}).get('id') or 
+            payload.get('pollId')
+        )
+        
+        # Robustly extract sender
+        sender = (
+            payload.get('sender') or 
+            payload.get('vote', {}).get('sender') or 
+            payload.get('vote', {}).get('from') or 
+            payload.get('from')
+        )
+        
+        # Robustly extract selected options
+        raw_options = (
+            payload.get('selectedOptions') or 
+            payload.get('vote', {}).get('selectedOptions') or 
+            []
+        )
+        
+        # Normalize selected options to a list of stripped strings
+        selected_options = []
+        for opt in raw_options:
+            if isinstance(opt, dict):
+                val = opt.get('name') or opt.get('text') or opt.get('value') or ""
+                if val:
+                    selected_options.append(str(val).strip())
+            elif opt is not None:
+                selected_options.append(str(opt).strip())
         
         if poll_message_id and sender:
             success = process_whatsapp_vote(poll_message_id, sender, selected_options)
