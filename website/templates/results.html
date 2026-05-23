@@ -28,9 +28,7 @@
 {% endif %}
 
 <div class="results-container mt-1">
-    <h3>Alle Terminvorschläge</h3>
-    {% for res in results %}
-        {% if poll.status == 'finalized' %}
+    {% if poll.status == 'finalized' %}
     <div class="card mb-1" style="border: 1px solid var(--primary); background: rgba(128, 0, 32, 0.1);">
         <h3 style="color: var(--primary);">🛡️ Finales Roster</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
@@ -52,6 +50,8 @@
     </div>
     {% endif %}
 
+    <h3>Alle Terminvorschläge</h3>
+    {% for res in results %}
     <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
