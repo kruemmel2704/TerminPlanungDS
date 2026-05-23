@@ -29,13 +29,53 @@
                 <button onclick="window.location.reload();" class="btn btn-outline" style="margin-top: 1rem;">Code aktualisieren</button>
             </div>
         {% elif status == 'online' or status == 'authorized' %}
-            <div style="margin-top: 2rem;">
-                <p>Dein WhatsApp Account ist erfolgreich verknüpft.</p>
-                <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">
-                    <a href="/admin" class="btn">Zurück zum Admin-Dashboard</a>
-                    <a href="{{ url_for('whatsapp.logout') }}" class="btn btn-outline" style="border-color: #f87171; color: #f87171;">Abmelden</a>
+                <div style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1.5rem; align-items: center;">
+                    
+                    <div style="width: 100%; max-width: 500px; text-align: left; padding: 1.5rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="margin-top: 0;">Standard-Chat für Benachrichtigungen</h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                            Wähle einen Chat aus, an den neue Abstimmungen automatisch gesendet werden sollen.
+                        </p>
+                        
+                        <form action="{{ url_for('whatsapp.set_default_chat') }}" method="POST" style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <select name="chat_id" id="chat_select" class="form-control" style="background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem;">
+                                <option value="">-- Chat auswählen --</option>
+                                {% for group in groups %}
+                                    <option value="{{ group.id }}" {% if user.whatsapp_chat_id == group.id %}selected{% endif %}>
+                                        {{ group.groupName }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <input type="hidden" name="chat_name" id="chat_name">
+                            <button type="submit" class="btn" style="width: 100%;">Standard-Chat Speichern</button>
+                        </form>
+                        
+                        {% if user.whatsapp_chat_name %}
+                            <p style="font-size: 0.8rem; margin-top: 0.8rem; color: #4ade80;">
+                                Aktueller Standard: <strong>{{ user.whatsapp_chat_name }}</strong>
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <a href="/admin" class="btn btn-outline">Zurück zum Admin-Dashboard</a>
+                        <a href="{{ url_for('whatsapp.logout') }}" class="btn btn-outline" style="border-color: #f87171; color: #f87171;">Abmelden</a>
+                    </div>
                 </div>
-            </div>
+
+                <script>
+                    document.getElementById('chat_select').addEventListener('change', function() {
+                        const selectedOption = this.options[this.selectedIndex];
+                        document.getElementById('chat_name').value = selectedOption.text.trim();
+                    });
+                    // Initialize chat_name if something is selected
+                    window.onload = function() {
+                        const select = document.getElementById('chat_select');
+                        if (select.value) {
+                            document.getElementById('chat_name').value = select.options[select.selectedIndex].text.trim();
+                        }
+                    };
+                </script>
         {% elif status == 'unconfigured' %}
             <div style="margin-top: 2rem; text-align: left;">
                 <p>Bitte trage deine <strong>GREEN_API_ID</strong> und <strong>GREEN_API_TOKEN</strong> in die <code>.env</code> Datei ein.</p>

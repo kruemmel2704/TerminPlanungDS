@@ -10,6 +10,8 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, default=False)
     google_token = db.Column(db.Text)  # Store JSON serialized token for Calendar
     google_calendar_id = db.Column(db.String(200), nullable=True) # Persistent calendar ID
+    whatsapp_chat_id = db.Column(db.String(100), nullable=True)
+    whatsapp_chat_name = db.Column(db.String(200), nullable=True)
 
 class Poll(db.Model):
     id = db.Column(db.Integer, primary_key=True)

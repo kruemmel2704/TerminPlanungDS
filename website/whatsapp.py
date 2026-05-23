@@ -27,10 +27,34 @@ def dashboard():
         if qr_resp:
             qr_data = qr_resp.get('message')
 
+    groups = []
+    if state in ['online', 'authorized']:
+        groups = wa_client.get_groups()
+
     return render_template("whatsapp.html", 
                            status=state, 
                            qr_data=qr_data, 
+                           groups=groups,
                            user=current_user)
+
+@whatsapp.route('/whatsapp/set_default', methods=['POST'])
+@login_required
+def set_default_chat():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+    
+    chat_id = request.form.get('chat_id')
+    chat_name = request.form.get('chat_name')
+    
+    if chat_id:
+        current_user.whatsapp_chat_id = chat_id
+        current_user.whatsapp_chat_name = chat_name
+        db.session.commit()
+        flash(f'Standard-Chat "{chat_name}" wurde gespeichert.', category='success')
+    else:
+        flash('Fehler beim Speichern des Standard-Chats.', category='error')
+        
+    return redirect(url_for('whatsapp.dashboard'))
 
 @whatsapp.route('/whatsapp/logout')
 @login_required
@@ -66,24 +90,18 @@ def share_poll(poll_id):
         elif len(poll.options) == 0:
             flash('Diese Abstimmung hat keine Terminvorschläge!', category='error')
         else:
-            # Handle single option case with Ja/Nein
-            if len(poll.options) == 1:
-                opt = poll.options[0]
-                options = ["Ja", "Nein"]
-                poll_name = f"Termin am {opt.start_time.strftime('%d.%m. %H:%M')}: {poll.title}"
-            else:
-                options = [opt.start_time.strftime("%d.%m. %H:%M") for opt in poll.options]
-                poll_name = f"Abstimmung: {poll.title}"
-            
+            # Construct reminder message
+            vote_url = url_for('routes.vote', poll_id=poll.id, _external=True)
+            message = f"🔔 *Reminder: Abstimmung für {poll.title}*\n\n"
             if poll.description:
-                poll_name += f"\n{poll.description}"
+                message += f"{poll.description}\n\n"
+            message += f"Du hast noch nicht abgestimmt? Hier klicken:\n{vote_url}"
             
-            # multiple_answers=True as requested
-            if wa_client.send_poll(chat_id, poll_name, options, multiple_answers=True):
-                flash(f'Umfrage wurde erfolgreich an WhatsApp gesendet!', category='success')
+            if wa_client.send_message(chat_id, message):
+                flash(f'Reminder wurde erfolgreich an WhatsApp gesendet!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
             else:
-                flash('Fehler beim Senden der Umfrage.', category='error')
+                flash('Fehler beim Senden des Reminders.', category='error')
 
     groups = wa_client.get_groups()
     return render_template("whatsapp_share.html", poll=poll, groups=groups, user=current_user)

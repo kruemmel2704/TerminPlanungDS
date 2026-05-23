@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from .models import Poll, Option, Vote, User
 from . import db
 from .calendar_utils import create_league_calendar, add_event_to_calendar
-from .whatsapp_utils import send_whatsapp_notification
+from .whatsapp import wa_client
 from datetime import datetime
 
 routes = Blueprint('routes', __name__)
@@ -48,6 +48,16 @@ def admin_dashboard():
                         db.session.add(new_opt)
                 
                 db.session.commit()
+                
+                # WhatsApp Push Notification
+                if current_user.whatsapp_chat_id:
+                    vote_url = url_for('routes.vote', poll_id=new_poll.id, _external=True)
+                    push_msg = f"🚀 *Neue Abstimmung gestartet: {new_poll.title}*\n\n"
+                    if new_poll.description:
+                        push_msg += f"{new_poll.description}\n\n"
+                    push_msg += f"Bitte hier abstimmen:\n{vote_url}"
+                    wa_client.send_message(current_user.whatsapp_chat_id, push_msg)
+
                 flash('Abstimmung erfolgreich erstellt!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
             except Exception as e:
@@ -141,11 +151,16 @@ def confirm_poll(poll_id):
         
         # Google Calendar Integration
         admin = User.query.filter_by(is_admin=True).first()
+        calendar_success = False
+        calendar_attempted = False
+        
         if admin and admin.google_token:
+            calendar_attempted = True
             if not admin.google_calendar_id:
                 cal_id = create_league_calendar(admin)
-                admin.google_calendar_id = cal_id
-                db.session.commit()
+                if cal_id:
+                    admin.google_calendar_id = cal_id
+                    db.session.commit()
             
             if admin.google_calendar_id:
                 # Create a temporary option object for the calendar utility
@@ -154,33 +169,17 @@ def confirm_poll(poll_id):
                 temp_opt = TempOpt(start_time=final_start, end_time=final_end)
                 
                 roster_desc = f"🛡️ War Orga: {poll.war_orga}\n⚔️ Spieler: {poll.players}\n🔄 Ersatz: {poll.substitutes}"
-                add_event_to_calendar(admin, temp_opt, f"{poll.title} - FINAL", roster_desc)
+                calendar_success = add_event_to_calendar(admin, temp_opt, f"{poll.title} - FINAL", roster_desc)
         
         db.session.commit()
         
-        # Send WhatsApp Notification
-        try:
-            start_str = final_start.strftime('%d.%m.%Y um %H:%M Uhr')
-            end_str = final_end.strftime('%H:%M Uhr')
+        if calendar_attempted and not calendar_success:
+            flash('Termin wurde final bestätigt, ABER das Eintragen in den Kalender ist fehlgeschlagen (Google-Token abgelaufen?). Bitte erneut in den Einstellungen anmelden.', category='warning')
+        elif calendar_success:
+            flash('Termin wurde final bestätigt und im Kalender eingetragen!', category='success')
+        else:
+            flash('Termin wurde final bestätigt!', category='success')
             
-            msg = (
-                f"📢 *Neuer Termin bestätigt!*\n\n"
-                f"🏆 *{poll.title}*\n"
-                f"📅 *Wann:* {start_str} - {end_str}\n"
-            )
-            if poll.description:
-                msg += f"📝 *Beschreibung:* _{poll.description}_\n"
-                
-            msg += (
-                f"\n🛡️ *War Orga:* {poll.war_orga or 'Keine'}\n"
-                f"⚔️ *Spieler:* {poll.players or 'Keine'}\n"
-                f"🔄 *Ersatz:* {poll.substitutes or 'Keine'}"
-            )
-            send_whatsapp_notification(msg)
-        except Exception as wa_err:
-            print(f"Failed to send WAHA notification: {wa_err}")
-
-        flash('Termin wurde final bestätigt und im Kalender eingetragen!', category='success')
         return redirect(url_for('routes.results', poll_id=poll.id))
 
     return render_template("confirm_poll.html", poll=poll, winner=winner, user=current_user)
