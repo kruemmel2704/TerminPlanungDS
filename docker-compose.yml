@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -20,7 +18,7 @@ services:
       - app-network
 
   waha:
-    image: devopsilo/waha
+    image: devlikeapro/waha
     container_name: waha
     restart: always
     ports:
