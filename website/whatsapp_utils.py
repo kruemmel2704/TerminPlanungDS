@@ -1,4 +1,5 @@
 import os
+import requests
 from whatsapp_api_client_python import API
 
 class WhatsAppClient:
@@ -89,3 +90,37 @@ class WhatsAppClient:
         except Exception as e:
             print(f"Error sending poll: {e}")
             return False
+
+def send_whatsapp_notification(text):
+    api_url = os.getenv('WHATSAPP_API_URL', 'http://waha:3000')
+    chat_id = os.getenv('WHATSAPP_GROUP_JID')
+    api_key = os.getenv('WHATSAPP_API_KEY')
+    
+    if not chat_id:
+        print("WAHA Warning: WHATSAPP_GROUP_JID is not configured. Notification not sent.")
+        return False
+        
+    url = f"{api_url.rstrip('/')}/api/sendText"
+    payload = {
+        "session": "default",
+        "chatId": chat_id,
+        "text": text
+    }
+    headers = {
+        "Content-Type": "application/json"
+    }
+    if api_key:
+        headers["X-Api-Key"] = api_key
+        
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code in [200, 201]:
+            print("WAHA Success: WhatsApp notification sent successfully!")
+            return True
+        else:
+            print(f"WAHA Error: Failed to send WhatsApp notification. Status code: {response.status_code}, Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"WAHA Exception: Failed to connect to WhatsApp API: {e}")
+        return False
+

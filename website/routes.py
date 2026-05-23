@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from .models import Poll, Option, Vote, User
 from . import db
 from .calendar_utils import create_league_calendar, add_event_to_calendar
+from .whatsapp_utils import send_whatsapp_notification
 from datetime import datetime
 
 routes = Blueprint('routes', __name__)
@@ -156,6 +157,29 @@ def confirm_poll(poll_id):
                 add_event_to_calendar(admin, temp_opt, f"{poll.title} - FINAL", roster_desc)
         
         db.session.commit()
+        
+        # Send WhatsApp Notification
+        try:
+            start_str = final_start.strftime('%d.%m.%Y um %H:%M Uhr')
+            end_str = final_end.strftime('%H:%M Uhr')
+            
+            msg = (
+                f"📢 *Neuer Termin bestätigt!*\n\n"
+                f"🏆 *{poll.title}*\n"
+                f"📅 *Wann:* {start_str} - {end_str}\n"
+            )
+            if poll.description:
+                msg += f"📝 *Beschreibung:* _{poll.description}_\n"
+                
+            msg += (
+                f"\n🛡️ *War Orga:* {poll.war_orga or 'Keine'}\n"
+                f"⚔️ *Spieler:* {poll.players or 'Keine'}\n"
+                f"🔄 *Ersatz:* {poll.substitutes or 'Keine'}"
+            )
+            send_whatsapp_notification(msg)
+        except Exception as wa_err:
+            print(f"Failed to send WAHA notification: {wa_err}")
+
         flash('Termin wurde final bestätigt und im Kalender eingetragen!', category='success')
         return redirect(url_for('routes.results', poll_id=poll.id))
 
