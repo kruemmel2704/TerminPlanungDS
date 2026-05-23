@@ -212,10 +212,29 @@ class WhatsAppClient:
             headers["X-Api-Key"] = self.api_key
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=10)
-            return response.status_code in [200, 201]
+            if response.status_code in [200, 201]:
+                return response.json()
+            return None
         except Exception as e:
             print(f"Error sending poll: {e}")
-            return False
+            return None
+
+    def get_contact(self, contact_id):
+        url = f"{self.api_url.rstrip('/')}/api/contacts"
+        params = {
+            "session": "default",
+            "contactId": contact_id
+        }
+        headers = {}
+        if self.api_key:
+            headers["X-Api-Key"] = self.api_key
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"Error getting contact: {e}")
+        return None
 
 
 def send_whatsapp_notification(text):

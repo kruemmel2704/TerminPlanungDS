@@ -54,6 +54,45 @@ def migrate():
             else:
                 print(f"Error adding poll_type column to poll table: {e}")
 
+        # Add whatsapp_poll_id to poll table
+        try:
+            print("Adding column whatsapp_poll_id to poll table...")
+            db.session.execute(text("ALTER TABLE poll ADD COLUMN whatsapp_poll_id VARCHAR(200)"))
+            db.session.commit()
+            print("Successfully added whatsapp_poll_id column to poll table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column whatsapp_poll_id already exists in poll table.")
+            else:
+                print(f"Error adding whatsapp_poll_id column to poll table: {e}")
+
+        # Add whatsapp_sender to vote table
+        try:
+            print("Adding column whatsapp_sender to vote table...")
+            db.session.execute(text("ALTER TABLE vote ADD COLUMN whatsapp_sender VARCHAR(100)"))
+            db.session.commit()
+            print("Successfully added whatsapp_sender column to vote table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column whatsapp_sender already exists in vote table.")
+            else:
+                print(f"Error adding whatsapp_sender column to vote table: {e}")
+
+        # Add is_whatsapp to vote table
+        try:
+            print("Adding column is_whatsapp to vote table...")
+            db.session.execute(text("ALTER TABLE vote ADD COLUMN is_whatsapp BOOLEAN DEFAULT 0"))
+            db.session.commit()
+            print("Successfully added is_whatsapp column to vote table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column is_whatsapp already exists in vote table.")
+            else:
+                print(f"Error adding is_whatsapp column to vote table: {e}")
+
 if __name__ == "__main__":
     migrate()
     print("Migration attempt finished.")

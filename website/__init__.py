@@ -27,6 +27,9 @@ def create_app():
     app.register_blueprint(auth, url_prefix='/')
     app.register_blueprint(whatsapp, url_prefix='/')
 
+    from .whatsapp import format_option_for_whatsapp
+    app.jinja_env.globals.update(format_option_for_whatsapp=format_option_for_whatsapp)
+
     from .models import User, Poll, Option, Vote
 
     with app.app_context():
