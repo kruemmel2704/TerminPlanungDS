@@ -149,6 +149,7 @@ nav {
 input[type="text"],
 input[type="email"],
 input[type="datetime-local"],
+input[type="date"],
 textarea {
     width: 100%;
     padding: 1rem;
@@ -249,3 +250,59 @@ input:focus, textarea:focus {
 .text-center { text-align: center; }
 .mb-2 { margin-bottom: 2rem; }
 .mt-1 { margin-top: 1rem; }
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.badge-liga {
+    background-color: var(--primary-color);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.badge-tcw {
+    background-color: #1d4ed8;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Type Selector */
+.type-selector {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.type-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem 1rem;
+    background: #141414;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.type-btn.active {
+    background: var(--glass-bg);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.type-btn:hover:not(.active) {
+    border-color: var(--primary-color);
+    color: var(--text-color);
+}

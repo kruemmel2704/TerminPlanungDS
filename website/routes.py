@@ -4,7 +4,7 @@ from .models import Poll, Option, Vote, User
 from . import db
 from .calendar_utils import create_league_calendar, add_event_to_calendar
 from .whatsapp import wa_client
-from datetime import datetime
+from datetime import datetime, timedelta
 
 routes = Blueprint('routes', __name__)
 
@@ -22,30 +22,49 @@ def admin_dashboard():
         return redirect(url_for('routes.home'))
 
     if request.method == 'POST':
+        poll_type = request.form.get('poll_type', 'single')
         title = request.form.get('title')
         description = request.form.get('description')
         deadline_str = request.form.get('deadline')
-        option_starts = request.form.getlist('option_start')
-        option_ends = request.form.getlist('option_end')
 
-        # Check if at least one option is fully filled
-        valid_options = any(s and e for s, e in zip(option_starts, option_ends))
+        parsed_options = []
 
-        if not title or not deadline_str or not valid_options:
-            flash('Bitte gib einen Titel, eine Deadline und mindestens einen vollständigen Terminvorschlag an!', category='error')
+        if poll_type == 'liga':
+            liga_start_date_str = request.form.get('liga_start_date')
+            if liga_start_date_str:
+                try:
+                    start_date = datetime.strptime(liga_start_date_str, '%Y-%m-%d')
+                    for i in range(5):
+                        day = start_date + timedelta(days=i)
+                        s_dt = day.replace(hour=20, minute=30, second=0, microsecond=0)
+                        e_dt = day.replace(hour=21, minute=30, second=0, microsecond=0)
+                        parsed_options.append((s_dt, e_dt))
+                except ValueError:
+                    pass
+        else: # single / tcw
+            single_dates = request.form.getlist('single_date')
+            for d_str in single_dates:
+                if d_str:
+                    try:
+                        day = datetime.strptime(d_str, '%Y-%m-%d')
+                        s_dt = day.replace(hour=20, minute=30, second=0, microsecond=0)
+                        e_dt = day.replace(hour=21, minute=30, second=0, microsecond=0)
+                        parsed_options.append((s_dt, e_dt))
+                    except ValueError:
+                        pass
+
+        if not title or not deadline_str or not parsed_options:
+            flash('Bitte gib einen Titel, eine Deadline und mindestens einen gültigen Terminvorschlag an!', category='error')
         else:
             try:
                 deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
-                new_poll = Poll(title=title, description=description, deadline=deadline)
+                new_poll = Poll(title=title, description=description, deadline=deadline, poll_type=poll_type)
                 db.session.add(new_poll)
                 db.session.flush()
 
-                for start, end in zip(option_starts, option_ends):
-                    if start and end:
-                        s_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M')
-                        e_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M')
-                        new_opt = Option(poll_id=new_poll.id, start_time=s_dt, end_time=e_dt)
-                        db.session.add(new_opt)
+                for s_dt, e_dt in parsed_options:
+                    new_opt = Option(poll_id=new_poll.id, start_time=s_dt, end_time=e_dt)
+                    db.session.add(new_opt)
                 
                 db.session.commit()
                 

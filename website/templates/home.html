@@ -12,7 +12,14 @@
         {% for poll in polls %}
             <div class="card poll-card">
                 <div>
-                    <h2>{{ poll.title }}</h2>
+                    <h2>
+                        {{ poll.title }}
+                        {% if poll.poll_type == 'liga' %}
+                            <span class="badge badge-liga" style="margin-left: 10px; vertical-align: middle;">Liga</span>
+                        {% else %}
+                            <span class="badge badge-tcw" style="margin-left: 10px; vertical-align: middle;">TCW</span>
+                        {% endif %}
+                    </h2>
                     <p style="color: var(--text-muted)">Deadline: {{ poll.deadline.strftime('%d.%m.%Y %H:%M') }}</p>
                 </div>
                 <a href="/vote/{{ poll.id }}" class="btn btn-primary">Jetzt Abstimmen</a>

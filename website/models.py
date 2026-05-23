@@ -21,6 +21,7 @@ class Poll(db.Model):
     deadline = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(50), default='voting') # voting, pending, finalized
+    poll_type = db.Column(db.String(50), default='single') # single (TCW), liga
     winner_option_id = db.Column(db.Integer, db.ForeignKey('option.id'), nullable=True)
     
     # Roster Fields
