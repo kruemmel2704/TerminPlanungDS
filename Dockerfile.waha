@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1
+# Define base stages for the different architectures
+FROM devlikeapro/waha:latest AS base-amd64
+FROM devlikeapro/waha:arm AS base-arm64
+
+# TARGETARCH is automatically populated by BuildKit (amd64, arm64, etc.)
+ARG TARGETARCH=amd64
+FROM base-${TARGETARCH}

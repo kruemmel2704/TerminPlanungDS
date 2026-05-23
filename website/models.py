@@ -23,6 +23,7 @@ class Poll(db.Model):
     status = db.Column(db.String(50), default='voting') # voting, pending, finalized
     poll_type = db.Column(db.String(50), default='single') # single (TCW), liga
     winner_option_id = db.Column(db.Integer, db.ForeignKey('option.id'), nullable=True)
+    whatsapp_poll_id = db.Column(db.String(200), nullable=True) # WhatsApp Message ID for the poll
     
     # Roster Fields
     war_orga = db.Column(db.String(200))
@@ -52,4 +53,6 @@ class Vote(db.Model):
     option_id = db.Column(db.Integer, db.ForeignKey('option.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user_name = db.Column(db.String(150), nullable=False)  # Cache username at time of vote
+    whatsapp_sender = db.Column(db.String(100), nullable=True) # WhatsApp JID
+    is_whatsapp = db.Column(db.Boolean, default=False) # True if vote was cast via WhatsApp
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
