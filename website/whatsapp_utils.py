@@ -28,7 +28,13 @@ class WhatsAppClient:
         if self.api_key:
             headers["X-Api-Key"] = self.api_key
         payload = {
-            "name": "default"
+            "name": "default",
+            "config": {
+                "store": {
+                    "enabled": True,
+                    "fullSync": True
+                }
+            }
         }
         try:
             requests.post(url, json=payload, headers=headers, timeout=5)
@@ -91,28 +97,72 @@ class WhatsAppClient:
             return False
 
     def get_groups(self):
-        url = f"{self.api_url.rstrip('/')}/api/default/chats"
         headers = {}
         if self.api_key:
             headers["X-Api-Key"] = self.api_key
+
+        # 1. Try to fetch specifically from /api/default/groups
+        url_groups = f"{self.api_url.rstrip('/')}/api/default/groups"
         try:
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url_groups, headers=headers, timeout=10)
             if response.status_code == 200:
-                chats = response.json()
-                groups = []
-                for chat in chats:
-                    chat_id = chat.get('id')
-                    is_group = chat_id.endswith('@g.us')
-                    name = chat.get('name') or chat_id
-                    groups.append({
-                        'id': chat_id,
-                        'groupName': f"👥 {name}" if is_group else f"👤 {name}"
-                    })
-                return groups
-            return []
+                groups_data = response.json()
+                if isinstance(groups_data, list) and len(groups_data) > 0:
+                    groups = []
+                    for g in groups_data:
+                        g_id = g.get('id')
+                        g_name = g.get('name') or g.get('subject') or g_id
+                        groups.append({
+                            'id': g_id,
+                            'groupName': f"👥 {g_name}"
+                        })
+                    return groups
         except Exception as e:
-            print(f"Error getting chats: {e}")
-            return []
+            print(f"Error getting from /api/default/groups: {e}")
+
+        # 2. Fallback: try to fetch from /api/default/chats
+        url_chats = f"{self.api_url.rstrip('/')}/api/default/chats"
+        try:
+            response = requests.get(url_chats, headers=headers, timeout=10)
+            if response.status_code == 200:
+                chats_data = response.json()
+                if isinstance(chats_data, list) and len(chats_data) > 0:
+                    groups = []
+                    for chat in chats_data:
+                        chat_id = chat.get('id')
+                        is_group = chat_id.endswith('@g.us')
+                        if is_group:
+                            name = chat.get('name') or chat.get('subject') or chat_id
+                            groups.append({
+                                'id': chat_id,
+                                'groupName': f"👥 {name}"
+                            })
+                    return groups
+        except Exception as e:
+            print(f"Error getting from /api/default/chats: {e}")
+
+        # 3. Fallback: try to fetch from /api/default/chats/overview
+        url_overview = f"{self.api_url.rstrip('/')}/api/default/chats/overview"
+        try:
+            response = requests.get(url_overview, headers=headers, timeout=10)
+            if response.status_code == 200:
+                chats_data = response.json()
+                if isinstance(chats_data, list) and len(chats_data) > 0:
+                    groups = []
+                    for chat in chats_data:
+                        chat_id = chat.get('id')
+                        is_group = chat_id.endswith('@g.us')
+                        if is_group:
+                            name = chat.get('name') or chat_id
+                            groups.append({
+                                'id': chat_id,
+                                'groupName': f"👥 {name}"
+                            })
+                    return groups
+        except Exception as e:
+            print(f"Error getting from /api/default/chats/overview: {e}")
+
+        return []
 
     def send_message(self, chat_id, text):
         url = f"{self.api_url.rstrip('/')}/api/sendText"
