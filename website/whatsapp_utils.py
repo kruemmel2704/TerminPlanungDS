@@ -2,6 +2,14 @@ import os
 import requests
 from whatsapp_api_client_python import API
 
+def normalize_id(id_val):
+    if not id_val:
+        return ""
+    if isinstance(id_val, dict):
+        return id_val.get('_serialized') or id_val.get('id') or f"{id_val.get('user')}@{id_val.get('server')}"
+    return str(id_val)
+
+
 class WhatsAppClient:
     def __init__(self):
         self.api_url = os.getenv('WHATSAPP_API_URL', 'http://waha:3000')
@@ -110,8 +118,9 @@ class WhatsAppClient:
                 if isinstance(groups_data, list) and len(groups_data) > 0:
                     groups = []
                     for g in groups_data:
-                        g_id = g.get('id')
-                        g_name = g.get('name') or g.get('subject') or g_id
+                        g_id = normalize_id(g.get('id'))
+                        raw_name = g.get('name') or g.get('subject')
+                        g_name = raw_name if raw_name else g_id
                         groups.append({
                             'id': g_id,
                             'groupName': f"👥 {g_name}"
@@ -129,10 +138,11 @@ class WhatsAppClient:
                 if isinstance(chats_data, list) and len(chats_data) > 0:
                     groups = []
                     for chat in chats_data:
-                        chat_id = chat.get('id')
+                        chat_id = normalize_id(chat.get('id'))
                         is_group = chat_id.endswith('@g.us')
                         if is_group:
-                            name = chat.get('name') or chat.get('subject') or chat_id
+                            raw_name = chat.get('name') or chat.get('subject')
+                            name = raw_name if raw_name else chat_id
                             groups.append({
                                 'id': chat_id,
                                 'groupName': f"👥 {name}"
@@ -150,10 +160,11 @@ class WhatsAppClient:
                 if isinstance(chats_data, list) and len(chats_data) > 0:
                     groups = []
                     for chat in chats_data:
-                        chat_id = chat.get('id')
+                        chat_id = normalize_id(chat.get('id'))
                         is_group = chat_id.endswith('@g.us')
                         if is_group:
-                            name = chat.get('name') or chat_id
+                            raw_name = chat.get('name')
+                            name = raw_name if raw_name else chat_id
                             groups.append({
                                 'id': chat_id,
                                 'groupName': f"👥 {name}"
