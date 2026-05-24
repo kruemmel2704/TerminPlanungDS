@@ -173,13 +173,15 @@ class WhatsAppClient:
 
         return []
 
-    def send_message(self, chat_id, text):
+    def send_message(self, chat_id, text, reply_to=None):
         url = f"{self.api_url.rstrip('/')}/api/sendText"
         payload = {
             "session": "default",
             "chatId": chat_id,
             "text": text
         }
+        if reply_to:
+            payload["reply_to"] = reply_to
         headers = {
             "Content-Type": "application/json"
         }

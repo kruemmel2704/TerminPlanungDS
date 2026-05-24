@@ -121,7 +121,7 @@ def share_poll(poll_id):
                 message += f"{poll.description}\n\n"
             message += f"Du hast noch nicht abgestimmt? Hier klicken:\n{vote_url}"
             
-            if wa_client.send_message(chat_id, message):
+            if wa_client.send_message(chat_id, message, reply_to=poll.whatsapp_poll_id):
                 flash(f'Reminder wurde erfolgreich an WhatsApp gesendet!', category='success')
                 return redirect(url_for('routes.admin_dashboard'))
             else:
@@ -270,6 +270,121 @@ def webhook():
                 wa_client.send_message(chat_id, "❌ Fehler beim Senden der Typ-Auswahl-Umfrage. Bitte versuche es erneut.")
             return jsonify({"status": "success"}), 200
             
+        elif body.lower() == '/clansitzung':
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
+                return jsonify({"status": "unauthorized"}), 200
+                
+            # Clear any existing state for this chat
+            WhatsAppState.query.filter_by(chat_id=chat_id).delete()
+            db.session.commit()
+            
+            # Start flow directly at awaiting_title with poll_type='clansitzung'
+            new_state = WhatsAppState(
+                chat_id=chat_id,
+                sender_jid=sender_jid,
+                state='awaiting_title',
+                poll_type='clansitzung'
+            )
+            db.session.add(new_state)
+            db.session.commit()
+            
+            prompt = "Du hast eine *Clansitzung (7 Tage Abfrage)* gestartet.\n\nBitte antworte jetzt mit dem *Titel* der Clansitzung (z.B. `Clansitzung Juni`):"
+            wa_client.send_message(chat_id, prompt)
+            return jsonify({"status": "success"}), 200
+            
+        elif body.lower() == '/zwischenstand':
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
+                return jsonify({"status": "unauthorized"}), 200
+                
+            # Clear any existing state for this chat
+            WhatsAppState.query.filter_by(chat_id=chat_id).delete()
+            db.session.commit()
+            
+            active_polls = Poll.query.filter_by(is_active=True).all()
+            if not active_polls:
+                wa_client.send_message(chat_id, "❌ Aktuell gibt es keine aktiven Abstimmungen.")
+                return jsonify({"status": "no_active_polls"}), 200
+                
+            # Start flow
+            new_state = WhatsAppState(
+                chat_id=chat_id,
+                sender_jid=sender_jid,
+                state='awaiting_zwischenstand_poll'
+            )
+            db.session.add(new_state)
+            db.session.commit()
+            
+            poll_name = "📊 Wähle die Abstimmung für den Zwischenstand:"
+            options = []
+            for p in active_polls:
+                opt_text = f"[{p.id}] {p.title}"
+                if len(opt_text) > 80:
+                    opt_text = opt_text[:77] + "..."
+                options.append(opt_text)
+                
+            resp = wa_client.send_poll(chat_id, poll_name, options, multiple_answers=False)
+            if resp and resp.get('id'):
+                new_state.whatsapp_poll_id = normalize_id(resp.get('id'))
+                db.session.commit()
+            else:
+                wa_client.send_message(chat_id, "❌ Fehler beim Senden der Abstimmungs-Auswahl. Bitte versuche es erneut.")
+            return jsonify({"status": "success"}), 200
+
+        elif body.lower() in ['/statics', '/statistik', '/statistics']:
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
+                return jsonify({"status": "unauthorized"}), 200
+                
+            votes = Vote.query.all()
+            polls = Poll.query.all()
+            polls_count = len(polls)
+            
+            if not votes or polls_count == 0:
+                wa_client.send_message(chat_id, "ℹ️ Es liegen noch keine Abstimmungen oder Stimmen vor, um Statistiken anzuzeigen.")
+                return jsonify({"status": "no_data"}), 200
+                
+            voter_polls = {}
+            voter_names = {}
+            voter_total_votes = {}
+            
+            for vote in votes:
+                option = Option.query.get(vote.option_id)
+                if not option:
+                    continue
+                poll_id = option.poll_id
+                
+                if vote.is_whatsapp:
+                    voter_id = vote.whatsapp_sender
+                else:
+                    voter_id = f"web_{vote.user_id}"
+                    
+                if voter_id not in voter_polls:
+                    voter_polls[voter_id] = set()
+                voter_polls[voter_id].add(poll_id)
+                
+                voter_names[voter_id] = vote.user_name
+                voter_total_votes[voter_id] = voter_total_votes.get(voter_id, 0) + 1
+                
+            # Sort by participation count (descending)
+            sorted_voters = sorted(voter_polls.items(), key=lambda x: len(x[1]), reverse=True)
+            
+            msg = "📊 *Statistik: Wer stimmt am fleißigsten ab?*\n\n"
+            for voter_id, voted_polls in sorted_voters:
+                name = voter_names[voter_id]
+                count = len(voted_polls)
+                pct = (count / polls_count) * 100
+                
+                avg_choices = voter_total_votes[voter_id] / count if count > 0 else 0
+                
+                msg += f"• *{name}*:\n"
+                msg += f"  Teilnahme: {pct:.1f}% ({count}/{polls_count} Umfragen)\n"
+                msg += f"  Stimmen pro Umfrage: {avg_choices:.1f}\n\n"
+                
+            wa_client.send_message(chat_id, msg)
+            return jsonify({"status": "success"}), 200
+            
         # If not /abstimmung, check if this chat has an active setup state
         state_record = WhatsAppState.query.filter_by(chat_id=chat_id).first()
         if state_record:
@@ -283,6 +398,12 @@ def webhook():
                         f"Titel: *{body}*\n\n"
                         "Bitte gib das *Startdatum* für das Liga-Spiel an (Format: `TT.MM.JJJJ`, z.B. `26.05.2026`).\n"
                         "Der Bot generiert automatisch 5 Termine an aufeinanderfolgenden Tagen ab diesem Datum (jeweils um 20:30 Uhr)."
+                    )
+                elif state_record.poll_type == 'clansitzung':
+                    prompt = (
+                        f"Titel: *{body}*\n\n"
+                        "Bitte gib das *Startdatum* für die Clansitzung an (Format: `TT.MM.JJJJ`, z.B. `26.05.2026`).\n"
+                        "Der Bot generiert automatisch 7 Termine an aufeinanderfolgenden Tagen ab diesem Datum (jeweils um 20:30 Uhr)."
                     )
                 else:
                     prompt = (
@@ -305,13 +426,14 @@ def webhook():
                             pass
                     return None
                 
-                if state_record.poll_type == 'liga':
+                if state_record.poll_type in ['liga', 'clansitzung']:
                     base_date = parse_german_date(body)
                     if not base_date:
                         wa_client.send_message(chat_id, "❌ *Ungültiges Datum.* Bitte verwende das Format `TT.MM.JJJJ` (z.B. `26.05.2026`):")
                         return jsonify({"status": "invalid_date"}), 200
                     
-                    for i in range(5):
+                    num_days = 7 if state_record.poll_type == 'clansitzung' else 5
+                    for i in range(num_days):
                         day = base_date + timedelta(days=i)
                         s_dt = day.replace(hour=20, minute=30, second=0, microsecond=0)
                         e_dt = day.replace(hour=21, minute=30, second=0, microsecond=0)
@@ -407,6 +529,51 @@ def webhook():
                     wa_client.send_message(state_record.chat_id, prompt)
                     return jsonify({"status": "success"}), 200
                     
+                elif state_record.state == 'awaiting_zwischenstand_poll':
+                    import re
+                    match = re.match(r'^\[(\d+)\]', selected_option)
+                    if not match:
+                        wa_client.send_message(state_record.chat_id, "❌ Ungültige Auswahl. Bitte wähle eine Option aus der Liste.")
+                        db.session.delete(state_record)
+                        db.session.commit()
+                        return jsonify({"status": "invalid_selection"}), 200
+                        
+                    poll_id = int(match.group(1))
+                    poll = Poll.query.get(poll_id)
+                    if not poll:
+                        wa_client.send_message(state_record.chat_id, "❌ Abstimmung nicht gefunden.")
+                        db.session.delete(state_record)
+                        db.session.commit()
+                        return jsonify({"status": "poll_not_found"}), 200
+                        
+                    msg = f"📊 *Zwischenstand: {poll.title}*\n\n"
+                    msg += "Aktuelle Stimmen:\n"
+                    
+                    sorted_opts = []
+                    for opt in poll.options:
+                        sorted_opts.append((opt, len(opt.votes)))
+                    sorted_opts.sort(key=lambda x: (-x[1], x[0].start_time))
+                    
+                    for opt, count in sorted_opts:
+                        opt_str = format_option_for_whatsapp(opt)
+                        voters = ", ".join([v.user_name for v in opt.votes])
+                        if voters:
+                            msg += f"• {opt_str}: *{count} Stimme(n)* ({voters})\n"
+                        else:
+                            msg += f"• {opt_str}: *{count} Stimme(n)*\n"
+                            
+                    wa_client.send_message(state_record.chat_id, msg)
+                    
+                    admin_user = User.query.filter_by(whatsapp_admin_chat_id=state_record.chat_id, is_admin=True).first()
+                    target_chat_id = (admin_user.whatsapp_chat_id if admin_user else None)
+                    if target_chat_id and target_chat_id != state_record.chat_id:
+                        wa_client.send_message(target_chat_id, msg)
+                        wa_client.send_message(state_record.chat_id, "✅ Der Zwischenstand wurde auch in die Gruppe gesendet.")
+                        
+                    db.session.delete(state_record)
+                    db.session.commit()
+                    return jsonify({"status": "success"}), 200
+                    
                 elif state_record.state == 'awaiting_deadline':
                     now = datetime.now()
                     if "12" in selected_option:
@@ -478,5 +645,75 @@ def webhook():
                     return jsonify({"status": "error", "message": "Poll not found"}), 404
                     
     return jsonify({"status": "ignored"}), 200
+
+
+def start_reminder_scheduler(app):
+    import threading
+    import time
+    from datetime import datetime, timezone, timedelta
+    
+    def scheduler_loop():
+        # Wait a few seconds to let the application start up fully
+        time.sleep(10)
+        while True:
+            try:
+                tz_utc_plus_1 = timezone(timedelta(hours=1))
+                now = datetime.now(tz_utc_plus_1)
+                if now.hour == 15:
+                    with app.app_context():
+                        from .models import Poll, User
+                        import os
+                        
+                        # Fetch all active polls with a WhatsApp poll ID
+                        active_polls = Poll.query.filter(
+                            Poll.is_active == True,
+                            Poll.whatsapp_poll_id != None,
+                            Poll.whatsapp_poll_id != ''
+                        ).all()
+                        
+                        for poll in active_polls:
+                            # Check if a reminder was already sent today (UTC+1 day)
+                            if poll.whatsapp_last_reminder_at:
+                                last_reminder_utc_plus_1 = poll.whatsapp_last_reminder_at.replace(tzinfo=timezone.utc).astimezone(tz_utc_plus_1)
+                                if last_reminder_utc_plus_1.date() == now.date():
+                                    continue
+                            
+                            # Construct reminder message
+                            redirect_uri = os.getenv('DISCORD_REDIRECT_URI') or 'http://localhost:5000/callback/discord'
+                            base_url = redirect_uri.split('/callback/discord')[0]
+                            vote_url = f"{base_url.rstrip('/')}/vote/{poll.id}"
+                            
+                            message = f"🔔 *Reminder: Abstimmung für {poll.title}*\n\n"
+                            if poll.description:
+                                message += f"{poll.description}\n\n"
+                            message += f"Du hast noch nicht abgestimmt? Hier klicken:\n{vote_url}"
+                            
+                            # Get target chat ID
+                            target_chat_id = None
+                            if poll.whatsapp_creator_chat_id:
+                                admin_user = User.query.filter_by(whatsapp_admin_chat_id=poll.whatsapp_creator_chat_id, is_admin=True).first()
+                                target_chat_id = (admin_user.whatsapp_chat_id if admin_user else None) or poll.whatsapp_creator_chat_id
+                            else:
+                                admin_user = User.query.filter_by(is_admin=True).first()
+                                if admin_user:
+                                    target_chat_id = admin_user.whatsapp_chat_id
+                                    
+                            if target_chat_id:
+                                success = wa_client.send_message(target_chat_id, message, reply_to=poll.whatsapp_poll_id)
+                                if success:
+                                    poll.whatsapp_last_reminder_at = datetime.utcnow()
+                                    db.session.commit()
+                                    print(f"Sent daily reminder for poll {poll.id} as a reply to {poll.whatsapp_poll_id}")
+                                else:
+                                    print(f"Failed to send daily reminder for poll {poll.id}")
+                
+                # Sleep 60 seconds to avoid repeating within the same hour
+                time.sleep(60)
+            except Exception as e:
+                print(f"Error in WhatsApp reminder scheduler: {e}")
+                time.sleep(30)
+                
+    scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True)
+    scheduler_thread.start()
 
 

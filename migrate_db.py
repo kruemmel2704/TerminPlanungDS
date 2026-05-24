@@ -119,6 +119,19 @@ def migrate():
             else:
                 print(f"Error adding whatsapp_creator_chat_id column to poll table: {e}")
 
+        # Add whatsapp_last_reminder_at to poll table
+        try:
+            print("Adding column whatsapp_last_reminder_at to poll table...")
+            db.session.execute(text("ALTER TABLE poll ADD COLUMN whatsapp_last_reminder_at DATETIME"))
+            db.session.commit()
+            print("Successfully added whatsapp_last_reminder_at column to poll table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column whatsapp_last_reminder_at already exists in poll table.")
+            else:
+                print(f"Error adding whatsapp_last_reminder_at column to poll table: {e}")
+
         # Add whatsapp_admin_chat_id to user table
         try:
             print("Adding column whatsapp_admin_chat_id to user table...")

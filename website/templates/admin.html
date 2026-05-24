@@ -76,6 +76,8 @@
                                 {{ poll.title }}
                                 {% if poll.poll_type == 'liga' %}
                                     <span class="badge badge-liga" style="margin-left: 10px; vertical-align: middle;">Liga</span>
+                                {% elif poll.poll_type == 'clansitzung' %}
+                                    <span class="badge badge-clansitzung" style="margin-left: 10px; vertical-align: middle; background-color: var(--warning-color, #f39c12);">Clansitzung</span>
                                 {% else %}
                                     <span class="badge badge-tcw" style="margin-left: 10px; vertical-align: middle;">TCW</span>
                                 {% endif %}
@@ -129,6 +131,8 @@
                                 {{ poll.title }}
                                 {% if poll.poll_type == 'liga' %}
                                     <span class="badge badge-liga" style="margin-left: 10px; vertical-align: middle;">Liga</span>
+                                {% elif poll.poll_type == 'clansitzung' %}
+                                    <span class="badge badge-clansitzung" style="margin-left: 10px; vertical-align: middle; background-color: var(--warning-color, #f39c12);">Clansitzung</span>
                                 {% else %}
                                     <span class="badge badge-tcw" style="margin-left: 10px; vertical-align: middle;">TCW</span>
                                 {% endif %}

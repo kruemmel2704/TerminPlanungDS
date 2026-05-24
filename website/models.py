@@ -27,6 +27,7 @@ class Poll(db.Model):
     winner_option_id = db.Column(db.Integer, db.ForeignKey('option.id'), nullable=True)
     whatsapp_poll_id = db.Column(db.String(200), nullable=True) # WhatsApp Message ID for the poll
     whatsapp_creator_chat_id = db.Column(db.String(100), nullable=True) # JID of the creator's DM
+    whatsapp_last_reminder_at = db.Column(db.DateTime, nullable=True) # Timestamp of the last sent WhatsApp reminder
     
     # Roster Fields
     war_orga = db.Column(db.String(200))
