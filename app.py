@@ -15,6 +15,10 @@ if __name__ == '__main__':
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     
+    # Start WhatsApp Reminder Scheduler
+    from website.whatsapp import start_reminder_scheduler
+    start_reminder_scheduler(app)
+    
     # Start Flask App
     # host='0.0.0.0' erlaubt den Zugriff von anderen Geräten im Netzwerk/Internet
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
