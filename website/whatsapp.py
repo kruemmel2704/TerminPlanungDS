@@ -238,13 +238,13 @@ def webhook():
         chat_id = normalize_id(payload.get('chatId') or payload.get('from'))
         body = (payload.get('body') or "").strip()
         
-        # Check if this sender JID is an authorized admin
-        admin_user = User.query.filter_by(whatsapp_admin_jid=sender_jid, is_admin=True).first()
+        # Check if the chat where the message was received is a configured admin chat
+        admin_user = User.query.filter_by(whatsapp_admin_chat_id=chat_id, is_admin=True).first()
         
         # Check if the admin sent /abstimmung
         if body.lower() == '/abstimmung':
             if not admin_user:
-                wa_client.send_message(chat_id, "❌ Du bist nicht als Administrator für diese App autorisiert oder deine Handynummer ist nicht verknüpft. Bitte verknüpfe sie im Dashboard.")
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
                 return jsonify({"status": "unauthorized"}), 200
                 
             # Clear any existing state for this chat
@@ -447,7 +447,7 @@ def webhook():
                     db.session.commit()
                     
                     # Sende die Umfrage an die Gruppe (Standardgruppe des Admins)
-                    admin_user = User.query.filter_by(whatsapp_admin_jid=state_record.sender_jid, is_admin=True).first()
+                    admin_user = User.query.filter_by(whatsapp_admin_chat_id=state_record.chat_id, is_admin=True).first()
                     target_chat_id = (admin_user.whatsapp_chat_id if admin_user else None) or state_record.chat_id
                     
                     wa_options = [format_option_for_whatsapp(opt) for opt in options_list]
