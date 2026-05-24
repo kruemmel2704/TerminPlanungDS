@@ -109,7 +109,49 @@ class WhatsAppClient:
         if self.api_key:
             headers["X-Api-Key"] = self.api_key
 
-        # 1. Try to fetch specifically from /api/default/groups
+        # 1. Try to fetch from /api/default/chats
+        url_chats = f"{self.api_url.rstrip('/')}/api/default/chats"
+        try:
+            response = requests.get(url_chats, headers=headers, timeout=10)
+            if response.status_code == 200:
+                chats_data = response.json()
+                if isinstance(chats_data, list) and len(chats_data) > 0:
+                    chats = []
+                    for chat in chats_data:
+                        chat_id = normalize_id(chat.get('id'))
+                        raw_name = chat.get('name') or chat.get('subject')
+                        name = raw_name if raw_name else chat_id
+                        prefix = "👥 " if chat_id.endswith('@g.us') else "👤 "
+                        chats.append({
+                            'id': chat_id,
+                            'groupName': f"{prefix}{name}"
+                        })
+                    return chats
+        except Exception as e:
+            print(f"Error getting from /api/default/chats: {e}")
+
+        # 2. Fallback: try to fetch from /api/default/chats/overview
+        url_overview = f"{self.api_url.rstrip('/')}/api/default/chats/overview"
+        try:
+            response = requests.get(url_overview, headers=headers, timeout=10)
+            if response.status_code == 200:
+                chats_data = response.json()
+                if isinstance(chats_data, list) and len(chats_data) > 0:
+                    chats = []
+                    for chat in chats_data:
+                        chat_id = normalize_id(chat.get('id'))
+                        raw_name = chat.get('name')
+                        name = raw_name if raw_name else chat_id
+                        prefix = "👥 " if chat_id.endswith('@g.us') else "👤 "
+                        chats.append({
+                            'id': chat_id,
+                            'groupName': f"{prefix}{name}"
+                        })
+                    return chats
+        except Exception as e:
+            print(f"Error getting from /api/default/chats/overview: {e}")
+
+        # 3. Fallback: try to fetch specifically from /api/default/groups
         url_groups = f"{self.api_url.rstrip('/')}/api/default/groups"
         try:
             response = requests.get(url_groups, headers=headers, timeout=10)
@@ -128,50 +170,6 @@ class WhatsAppClient:
                     return groups
         except Exception as e:
             print(f"Error getting from /api/default/groups: {e}")
-
-        # 2. Fallback: try to fetch from /api/default/chats
-        url_chats = f"{self.api_url.rstrip('/')}/api/default/chats"
-        try:
-            response = requests.get(url_chats, headers=headers, timeout=10)
-            if response.status_code == 200:
-                chats_data = response.json()
-                if isinstance(chats_data, list) and len(chats_data) > 0:
-                    groups = []
-                    for chat in chats_data:
-                        chat_id = normalize_id(chat.get('id'))
-                        is_group = chat_id.endswith('@g.us')
-                        if is_group:
-                            raw_name = chat.get('name') or chat.get('subject')
-                            name = raw_name if raw_name else chat_id
-                            groups.append({
-                                'id': chat_id,
-                                'groupName': f"👥 {name}"
-                            })
-                    return groups
-        except Exception as e:
-            print(f"Error getting from /api/default/chats: {e}")
-
-        # 3. Fallback: try to fetch from /api/default/chats/overview
-        url_overview = f"{self.api_url.rstrip('/')}/api/default/chats/overview"
-        try:
-            response = requests.get(url_overview, headers=headers, timeout=10)
-            if response.status_code == 200:
-                chats_data = response.json()
-                if isinstance(chats_data, list) and len(chats_data) > 0:
-                    groups = []
-                    for chat in chats_data:
-                        chat_id = normalize_id(chat.get('id'))
-                        is_group = chat_id.endswith('@g.us')
-                        if is_group:
-                            raw_name = chat.get('name')
-                            name = raw_name if raw_name else chat_id
-                            groups.append({
-                                'id': chat_id,
-                                'groupName': f"👥 {name}"
-                            })
-                    return groups
-        except Exception as e:
-            print(f"Error getting from /api/default/chats/overview: {e}")
 
         return []
 

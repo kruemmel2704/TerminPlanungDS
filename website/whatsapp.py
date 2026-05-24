@@ -58,26 +58,25 @@ def set_default_chat():
         
     return redirect(url_for('whatsapp.dashboard'))
 
-@whatsapp.route('/whatsapp/set_admin_phone', methods=['POST'])
+@whatsapp.route('/whatsapp/set_admin_chat', methods=['POST'])
 @login_required
-def set_admin_phone():
+def set_admin_chat():
     if not current_user.is_admin:
         return redirect(url_for('routes.home'))
     
-    phone = request.form.get('admin_phone', '').strip()
-    if phone:
-        # Normalize the phone number (remove +, spaces, ensure JID)
-        normalized_phone = phone.replace('+', '').replace(' ', '').strip()
-        if not normalized_phone.endswith('@c.us'):
-            normalized_phone = f"{normalized_phone}@c.us"
-        
-        current_user.whatsapp_admin_jid = normalized_phone
+    chat_id = request.form.get('admin_chat_id')
+    chat_name = request.form.get('admin_chat_name')
+    
+    if chat_id:
+        current_user.whatsapp_admin_chat_id = chat_id
+        current_user.whatsapp_admin_chat_name = chat_name
         db.session.commit()
-        flash(f'Deine WhatsApp-Nummer wurde erfolgreich verknüpft!', category='success')
+        flash(f'Admin-Chat "{chat_name}" wurde gespeichert.', category='success')
     else:
-        current_user.whatsapp_admin_jid = None
+        current_user.whatsapp_admin_chat_id = None
+        current_user.whatsapp_admin_chat_name = None
         db.session.commit()
-        flash('Verknüpfung aufgehoben.', category='success')
+        flash('Admin-Chat wurde entfernt.', category='success')
         
     return redirect(url_for('whatsapp.dashboard'))
 
