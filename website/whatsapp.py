@@ -1,8 +1,10 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from .whatsapp_utils import WhatsAppClient, normalize_id
-from .models import Poll, Option, Vote, User
+from .models import Poll, Option, Vote, User, WhatsAppState
 from . import db
+from datetime import datetime, timedelta
+import json
 
 whatsapp = Blueprint('whatsapp', __name__)
 wa_client = WhatsAppClient()
@@ -53,6 +55,29 @@ def set_default_chat():
         flash(f'Standard-Chat "{chat_name}" wurde gespeichert.', category='success')
     else:
         flash('Fehler beim Speichern des Standard-Chats.', category='error')
+        
+    return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/set_admin_phone', methods=['POST'])
+@login_required
+def set_admin_phone():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+    
+    phone = request.form.get('admin_phone', '').strip()
+    if phone:
+        # Normalize the phone number (remove +, spaces, ensure JID)
+        normalized_phone = phone.replace('+', '').replace(' ', '').strip()
+        if not normalized_phone.endswith('@c.us'):
+            normalized_phone = f"{normalized_phone}@c.us"
+        
+        current_user.whatsapp_admin_jid = normalized_phone
+        db.session.commit()
+        flash(f'Deine WhatsApp-Nummer wurde erfolgreich verknüpft!', category='success')
+    else:
+        current_user.whatsapp_admin_jid = None
+        db.session.commit()
+        flash('Verknüpfung aufgehoben.', category='success')
         
     return redirect(url_for('whatsapp.dashboard'))
 
@@ -207,7 +232,125 @@ def webhook():
     data = request.json or {}
     print(f"Received WAHA webhook: {data}")
     event = data.get('event')
-    if event == 'poll.vote':
+    
+    if event == 'message':
+        payload = data.get('payload', {})
+        sender_jid = normalize_id(payload.get('from'))
+        chat_id = normalize_id(payload.get('chatId') or payload.get('from'))
+        body = (payload.get('body') or "").strip()
+        
+        # Check if this sender JID is an authorized admin
+        admin_user = User.query.filter_by(whatsapp_admin_jid=sender_jid, is_admin=True).first()
+        
+        # Check if the admin sent /abstimmung
+        if body.lower() == '/abstimmung':
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Du bist nicht als Administrator für diese App autorisiert oder deine Handynummer ist nicht verknüpft. Bitte verknüpfe sie im Dashboard.")
+                return jsonify({"status": "unauthorized"}), 200
+                
+            # Clear any existing state for this chat
+            WhatsAppState.query.filter_by(chat_id=chat_id).delete()
+            db.session.commit()
+            
+            # Start flow: send poll to select poll type
+            new_state = WhatsAppState(
+                chat_id=chat_id,
+                sender_jid=sender_jid,
+                state='awaiting_type'
+            )
+            db.session.add(new_state)
+            db.session.commit()
+            
+            poll_name = "🏆 Wähle den Typ der Abstimmung:"
+            options = ["🏆 Liga Spiel (5 Tage)", "⚔️ TCW / Single Event"]
+            resp = wa_client.send_poll(chat_id, poll_name, options, multiple_answers=False)
+            if resp and resp.get('id'):
+                new_state.whatsapp_poll_id = normalize_id(resp.get('id'))
+                db.session.commit()
+            else:
+                wa_client.send_message(chat_id, "❌ Fehler beim Senden der Typ-Auswahl-Umfrage. Bitte versuche es erneut.")
+            return jsonify({"status": "success"}), 200
+            
+        # If not /abstimmung, check if this chat has an active setup state
+        state_record = WhatsAppState.query.filter_by(chat_id=chat_id).first()
+        if state_record:
+            if state_record.state == 'awaiting_title':
+                state_record.title = body
+                state_record.state = 'awaiting_date'
+                db.session.commit()
+                
+                if state_record.poll_type == 'liga':
+                    prompt = (
+                        f"Titel: *{body}*\n\n"
+                        "Bitte gib das *Startdatum* für das Liga-Spiel an (Format: `TT.MM.JJJJ`, z.B. `26.05.2026`).\n"
+                        "Der Bot generiert automatisch 5 Termine an aufeinanderfolgenden Tagen ab diesem Datum (jeweils um 20:30 Uhr)."
+                    )
+                else:
+                    prompt = (
+                        f"Titel: *{body}*\n\n"
+                        "Bitte gib die *Termine* an (Format: `TT.MM.JJJJ`, mehrere durch Komma oder neue Zeile getrennt, z.B. `26.05.2026, 28.05.2026`).\n"
+                        "Die Termine starten jeweils um 20:30 Uhr."
+                    )
+                wa_client.send_message(chat_id, prompt)
+                return jsonify({"status": "success"}), 200
+                
+            elif state_record.state == 'awaiting_date':
+                dates_list = []
+                
+                def parse_german_date(date_str):
+                    date_str = date_str.strip()
+                    for fmt in ('%d.%m.%Y', '%d.%m.%y', '%Y-%m-%d'):
+                        try:
+                            return datetime.strptime(date_str, fmt)
+                        except ValueError:
+                            pass
+                    return None
+                
+                if state_record.poll_type == 'liga':
+                    base_date = parse_german_date(body)
+                    if not base_date:
+                        wa_client.send_message(chat_id, "❌ *Ungültiges Datum.* Bitte verwende das Format `TT.MM.JJJJ` (z.B. `26.05.2026`):")
+                        return jsonify({"status": "invalid_date"}), 200
+                    
+                    for i in range(5):
+                        day = base_date + timedelta(days=i)
+                        s_dt = day.replace(hour=20, minute=30, second=0, microsecond=0)
+                        e_dt = day.replace(hour=21, minute=30, second=0, microsecond=0)
+                        dates_list.append((s_dt.strftime('%Y-%m-%d %H:%M:%S'), e_dt.strftime('%Y-%m-%d %H:%M:%S')))
+                else:
+                    parts = []
+                    for line in body.replace('\r', '\n').split('\n'):
+                        for p in line.split(','):
+                            p_clean = p.strip()
+                            if p_clean:
+                                parts.append(p_clean)
+                    
+                    for p in parts:
+                        parsed_dt = parse_german_date(p)
+                        if parsed_dt:
+                            s_dt = parsed_dt.replace(hour=20, minute=30, second=0, microsecond=0)
+                            e_dt = parsed_dt.replace(hour=21, minute=30, second=0, microsecond=0)
+                            dates_list.append((s_dt.strftime('%Y-%m-%d %H:%M:%S'), e_dt.strftime('%Y-%m-%d %H:%M:%S')))
+                            
+                    if not dates_list:
+                        wa_client.send_message(chat_id, "❌ *Keine gültigen Termine gefunden.* Bitte gib mindestens ein gültiges Datum im Format `TT.MM.JJJJ` an (mehrere durch Komma getrennt):")
+                        return jsonify({"status": "invalid_date"}), 200
+                
+                state_record.dates = json.dumps(dates_list)
+                state_record.state = 'awaiting_deadline'
+                db.session.commit()
+                
+                poll_name = "⏱️ Wähle die Abstimmungs-Deadline:"
+                options = ["⏱️ In 12 Stunden", "⏱️ In 24 Stunden", "⏱️ In 48 Stunden", "⏱️ In 3 Tagen"]
+                resp = wa_client.send_poll(chat_id, poll_name, options, multiple_answers=False)
+                if resp and resp.get('id'):
+                    state_record.whatsapp_poll_id = normalize_id(resp.get('id'))
+                    db.session.commit()
+                else:
+                    wa_client.send_message(chat_id, "❌ Fehler beim Senden der Deadline-Umfrage. Bitte versuche es erneut.")
+                return jsonify({"status": "success"}), 200
+                
+    elif event == 'poll.vote':
         payload = data.get('payload', {})
         
         # Robustly extract poll message ID
@@ -219,7 +362,6 @@ def webhook():
             payload.get('pollId')
         )
         
-        # Robustly extract sender
         sender = (
             payload.get('sender') or 
             payload.get('vote', {}).get('sender') or 
@@ -227,14 +369,12 @@ def webhook():
             payload.get('from')
         )
         
-        # Robustly extract selected options
         raw_options = (
             payload.get('selectedOptions') or 
             payload.get('vote', {}).get('selectedOptions') or 
             []
         )
         
-        # Normalize selected options to a list of stripped strings
         selected_options = []
         for opt in raw_options:
             if isinstance(opt, dict):
@@ -243,14 +383,101 @@ def webhook():
                     selected_options.append(str(val).strip())
             elif opt is not None:
                 selected_options.append(str(opt).strip())
-        
-        if poll_message_id and sender:
-            success = process_whatsapp_vote(poll_message_id, sender, selected_options)
-            if success:
-                return jsonify({"status": "success"}), 200
-            else:
-                return jsonify({"status": "error", "message": "Poll not found"}), 404
                 
+        if poll_message_id and sender:
+            # Check if this is a config vote for a WhatsAppState setup flow
+            state_record = WhatsAppState.query.filter_by(whatsapp_poll_id=poll_message_id).first()
+            if state_record:
+                if not selected_options:
+                    return jsonify({"status": "ignored"}), 200
+                    
+                selected_option = selected_options[0]
+                
+                if state_record.state == 'awaiting_type':
+                    if "Liga" in selected_option:
+                        state_record.poll_type = 'liga'
+                        prompt = "Du hast *🏆 Liga Spiel* ausgewählt.\n\nBitte antworte jetzt mit dem *Titel* der Abstimmung (z.B. `DS vs. GegnerName`):"
+                    else:
+                        state_record.poll_type = 'single'
+                        prompt = "Du hast *⚔️ TCW / Single Event* ausgewählt.\n\nBitte antworte jetzt mit dem *Titel* der Abstimmung (z.B. `TCW Woche 5`):"
+                    
+                    state_record.state = 'awaiting_title'
+                    state_record.whatsapp_poll_id = None
+                    db.session.commit()
+                    
+                    wa_client.send_message(state_record.chat_id, prompt)
+                    return jsonify({"status": "success"}), 200
+                    
+                elif state_record.state == 'awaiting_deadline':
+                    now = datetime.now()
+                    if "12" in selected_option:
+                        deadline = now + timedelta(hours=12)
+                    elif "24" in selected_option:
+                        deadline = now + timedelta(hours=24)
+                    elif "48" in selected_option:
+                        deadline = now + timedelta(hours=48)
+                    else:
+                        deadline = now + timedelta(days=3)
+                    
+                    poll_type = state_record.poll_type
+                    title = state_record.title
+                    
+                    try:
+                        parsed_dates = json.loads(state_record.dates)
+                    except Exception:
+                        parsed_dates = []
+                        
+                    new_poll = Poll(
+                        title=title,
+                        description="Erstellt per WhatsApp",
+                        deadline=deadline,
+                        poll_type=poll_type,
+                        whatsapp_creator_chat_id=state_record.chat_id
+                    )
+                    db.session.add(new_poll)
+                    db.session.flush()
+                    
+                    options_list = []
+                    for s_dt_str, e_dt_str in parsed_dates:
+                        s_dt = datetime.strptime(s_dt_str, '%Y-%m-%d %H:%M:%S')
+                        e_dt = datetime.strptime(e_dt_str, '%Y-%m-%d %H:%M:%S')
+                        new_opt = Option(poll_id=new_poll.id, start_time=s_dt, end_time=e_dt)
+                        db.session.add(new_opt)
+                        options_list.append(new_opt)
+                    
+                    db.session.commit()
+                    
+                    # Sende die Umfrage an die Gruppe (Standardgruppe des Admins)
+                    admin_user = User.query.filter_by(whatsapp_admin_jid=state_record.sender_jid, is_admin=True).first()
+                    target_chat_id = (admin_user.whatsapp_chat_id if admin_user else None) or state_record.chat_id
+                    
+                    wa_options = [format_option_for_whatsapp(opt) for opt in options_list]
+                    poll_name = f"⚔️ Abstimmung: {new_poll.title}"
+                    
+                    response = wa_client.send_poll(target_chat_id, poll_name, wa_options, multiple_answers=True)
+                    if response and response.get('id'):
+                        new_poll.whatsapp_poll_id = normalize_id(response.get('id'))
+                        db.session.commit()
+                        
+                        success_msg = f"✅ *Abstimmung erfolgreich gestartet!*\n\nDie Umfrage wurde in die Gruppe gesendet."
+                        wa_client.send_message(state_record.chat_id, success_msg)
+                    else:
+                        error_msg = f"❌ *Fehler beim Starten der Umfrage auf WhatsApp.*\nDie Abstimmung wurde in der App erstellt, konnte aber nicht an WhatsApp gesendet werden."
+                        wa_client.send_message(state_record.chat_id, error_msg)
+                        
+                    db.session.delete(state_record)
+                    db.session.commit()
+                    
+                    return jsonify({"status": "success"}), 200
+            
+            else:
+                # Normal voter vote processing
+                success = process_whatsapp_vote(poll_message_id, sender, selected_options)
+                if success:
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"status": "error", "message": "Poll not found"}), 404
+                    
     return jsonify({"status": "ignored"}), 200
 
 

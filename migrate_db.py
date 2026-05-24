@@ -93,6 +93,32 @@ def migrate():
             else:
                 print(f"Error adding is_whatsapp column to vote table: {e}")
 
+        # Add whatsapp_admin_jid to user table
+        try:
+            print("Adding column whatsapp_admin_jid to user table...")
+            db.session.execute(text("ALTER TABLE user ADD COLUMN whatsapp_admin_jid VARCHAR(100)"))
+            db.session.commit()
+            print("Successfully added whatsapp_admin_jid column to user table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column whatsapp_admin_jid already exists in user table.")
+            else:
+                print(f"Error adding whatsapp_admin_jid column to user table: {e}")
+
+        # Add whatsapp_creator_chat_id to poll table
+        try:
+            print("Adding column whatsapp_creator_chat_id to poll table...")
+            db.session.execute(text("ALTER TABLE poll ADD COLUMN whatsapp_creator_chat_id VARCHAR(100)"))
+            db.session.commit()
+            print("Successfully added whatsapp_creator_chat_id column to poll table.")
+        except Exception as e:
+            db.session.rollback()
+            if "duplicate" in str(e).lower() or "already exists" in str(e).lower():
+                print("Column whatsapp_creator_chat_id already exists in poll table.")
+            else:
+                print(f"Error adding whatsapp_creator_chat_id column to poll table: {e}")
+
 if __name__ == "__main__":
     migrate()
     print("Migration attempt finished.")
