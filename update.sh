@@ -7,18 +7,25 @@ echo "🚀 Starte App- und Datenbank-Update..."
 echo "📥 Lade neueste Code-Änderungen von Git..."
 git pull
 
-# 2. Update Python dependencies (in venv)
-if [ -d "venv" ]; then
-    echo "📦 Aktualisiere Python-Abhängigkeiten im venv..."
-    venv/bin/pip install -r requirements.txt
+# 2. Update Python dependencies (in venv / .venv)
+VENV_DIR=""
+if [ -d ".venv" ]; then
+    VENV_DIR=".venv"
+elif [ -d "venv" ]; then
+    VENV_DIR="venv"
+fi
+
+if [ -n "$VENV_DIR" ]; then
+    echo "📦 Aktualisiere Python-Abhängigkeiten im $VENV_DIR..."
+    $VENV_DIR/bin/pip install -r requirements.txt
 else
-    echo "⚠️ Kein venv gefunden. Überspringe pip install. Falls nötig, installiere manuell."
+    echo "⚠️ Kein venv oder .venv gefunden. Überspringe pip install. Falls nötig, installiere manuell."
 fi
 
 # 3. Run database migrations
 echo "🗄️ Führe Datenbank-Migrationen aus..."
-if [ -d "venv" ]; then
-    venv/bin/python3 update_db.py
+if [ -n "$VENV_DIR" ]; then
+    $VENV_DIR/bin/python3 update_db.py
 else
     python3 update_db.py
 fi
