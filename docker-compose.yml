@@ -31,7 +31,7 @@ services:
       - WAHA_PRINT_QR=true
       - WAHA_API_KEY=${WHATSAPP_API_KEY}
       - WHATSAPP_HOOK_URL=http://web:5000/whatsapp/webhook
-      - WHATSAPP_HOOK_EVENTS=poll.vote,poll.vote.failed
+      - WHATSAPP_HOOK_EVENTS=message,poll.vote,poll.vote.failed
     networks:
       - app-network
 

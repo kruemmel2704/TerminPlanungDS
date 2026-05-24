@@ -277,3 +277,41 @@ def finalize_poll(poll):
         poll.winner_option_id = winner_opt.id
                 
     db.session.commit()
+
+    # Notify creator if poll was created via WhatsApp
+    if poll.whatsapp_creator_chat_id:
+        from website.whatsapp import format_option_for_whatsapp, wa_client
+        from flask import url_for, current_app
+        
+        # Build results message
+        msg = f"📊 *Abstimmung abgeschlossen: {poll.title}*\n\n"
+        msg += "Ergebnisse:\n"
+        
+        # Sort options by vote count
+        sorted_opts = []
+        for opt in poll.options:
+            sorted_opts.append((opt, len(opt.votes)))
+        sorted_opts.sort(key=lambda x: x[1], reverse=True)
+        
+        for opt, count in sorted_opts:
+            opt_str = format_option_for_whatsapp(opt)
+            voters = ", ".join([v.user_name for v in opt.votes])
+            if voters:
+                msg += f"• {opt_str}: *{count} Stimme(n)* ({voters})\n"
+            else:
+                msg += f"• {opt_str}: *{count} Stimme(n)*\n"
+                
+        if winner_opt:
+            winner_str = format_option_for_whatsapp(winner_opt)
+            msg += f"\n🏆 *Gewinner-Termin:* {winner_str}\n"
+            
+        try:
+            roster_url = url_for('routes.confirm_poll', poll_id=poll.id, _external=True)
+        except RuntimeError:
+            server_name = current_app.config.get('SERVER_NAME') or 'localhost:5000'
+            roster_url = f"http://{server_name}/admin/confirm/{poll.id}"
+            
+        msg += f"\n🛡️ Erstelle das Roster auf folgender Seite:\n{roster_url}"
+        
+        # Send via WhatsApp client
+        wa_client.send_message(poll.whatsapp_creator_chat_id, msg)

@@ -57,6 +57,26 @@
                         {% endif %}
                     </div>
 
+                    <div style="width: 100%; max-width: 500px; text-align: left; padding: 1.5rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="margin-top: 0;">Deine persönliche WhatsApp-Nummer</h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                            Trage deine eigene WhatsApp-Nummer ein, damit du den Bot über Direktnachrichten (z.B. mit <code>/abstimmung</code>) steuern kannst.
+                        </p>
+                        
+                        <form action="{{ url_for('whatsapp.set_admin_phone') }}" method="POST" style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <input type="text" name="admin_phone" placeholder="z.B. +491761234567" class="form-control" 
+                                   value="{{ user.whatsapp_admin_jid.split('@')[0] if user.whatsapp_admin_jid else '' }}"
+                                   style="background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem;">
+                            <button type="submit" class="btn" style="width: 100%;">Nummer verknüpfen</button>
+                        </form>
+                        
+                        {% if user.whatsapp_admin_jid %}
+                            <p style="font-size: 0.8rem; margin-top: 0.8rem; color: #4ade80;">
+                                Aktuell verknüpft: <strong>+{{ user.whatsapp_admin_jid.split('@')[0] }}</strong>
+                            </p>
+                        {% endif %}
+                    </div>
+
                     <div style="display: flex; gap: 1rem; justify-content: center;">
                         <a href="/admin" class="btn btn-outline">Zurück zum Admin-Dashboard</a>
                         <a href="{{ url_for('whatsapp.logout') }}" class="btn btn-outline" style="border-color: #f87171; color: #f87171;">Abmelden</a>

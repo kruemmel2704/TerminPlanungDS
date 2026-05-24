@@ -12,6 +12,7 @@ class User(db.Model, UserMixin):
     google_calendar_id = db.Column(db.String(200), nullable=True) # Persistent calendar ID
     whatsapp_chat_id = db.Column(db.String(100), nullable=True)
     whatsapp_chat_name = db.Column(db.String(200), nullable=True)
+    whatsapp_admin_jid = db.Column(db.String(100), nullable=True)
 
 class Poll(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -24,6 +25,7 @@ class Poll(db.Model):
     poll_type = db.Column(db.String(50), default='single') # single (TCW), liga
     winner_option_id = db.Column(db.Integer, db.ForeignKey('option.id'), nullable=True)
     whatsapp_poll_id = db.Column(db.String(200), nullable=True) # WhatsApp Message ID for the poll
+    whatsapp_creator_chat_id = db.Column(db.String(100), nullable=True) # JID of the creator's DM
     
     # Roster Fields
     war_orga = db.Column(db.String(200))
@@ -62,4 +64,15 @@ class Vote(db.Model):
     user_name = db.Column(db.String(150), nullable=False)  # Cache username at time of vote
     whatsapp_sender = db.Column(db.String(100), nullable=True) # WhatsApp JID
     is_whatsapp = db.Column(db.Boolean, default=False) # True if vote was cast via WhatsApp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class WhatsAppState(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.String(100), unique=True, nullable=False)
+    sender_jid = db.Column(db.String(100), nullable=False)
+    state = db.Column(db.String(50), nullable=False) # awaiting_type, awaiting_title, awaiting_date, awaiting_deadline
+    poll_type = db.Column(db.String(50), nullable=True)
+    title = db.Column(db.String(200), nullable=True)
+    dates = db.Column(db.Text, nullable=True) # JSON string of generated options: [[start_time, end_time], ...]
+    whatsapp_poll_id = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
