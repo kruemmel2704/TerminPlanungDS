@@ -102,8 +102,8 @@ fi
 # Webhook Service Installation
 echo "⚙️ Installiere den Webhook-Service für automatische Updates..."
 
-# Get the non-root user who invoked sudo (if run via sudo), default to current user
-REAL_USER=${SUDO_USER:-$USER}
+# Get the owner of the repository directory to avoid git dubious ownership errors
+REAL_USER=$(stat -c '%U' . 2>/dev/null || stat -f '%Su' . 2>/dev/null || echo "${SUDO_USER:-$USER}")
 if [ "$REAL_USER" = "root" ] && [ -n "$LOGNAME" ]; then
     REAL_USER=$LOGNAME
 fi
@@ -139,5 +139,7 @@ systemctl start terminplaner-webhook.service
 echo "✅ Webhook-Service wurde erfolgreich installiert und gestartet!"
 echo "📡 Der Service lauscht auf Port 5001. Konfiguriere deinen GitHub/GitLab-Webhook auf: http://<deine-server-ip>:5001"
 echo "ℹ️ Optional: Füge 'WEBHOOK_SECRET=dein_secret' zu deiner .env hinzu, um Webhook-Signaturen zu verifizieren."
+echo "⚠️ Wichtig: Stelle sicher, dass der Benutzer '$REAL_USER' in der 'docker' Gruppe ist, falls du Docker verwendest:"
+echo "    sudo usermod -aG docker $REAL_USER"
 
 echo "Installation complete!"

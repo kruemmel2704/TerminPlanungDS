@@ -41,9 +41,11 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
         
-        print("🔔 Webhook received! Running update.sh...")
-        # Run update.sh in a background process
-        subprocess.Popen(["./update.sh"])
+        # Run update.sh in a background process using absolute paths
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        update_script = os.path.join(script_dir, "update.sh")
+        print(f"🔔 Webhook received! Running {update_script} in {script_dir}...")
+        subprocess.Popen([update_script], cwd=script_dir)
 
 def run():
     server_address = ('', PORT)
