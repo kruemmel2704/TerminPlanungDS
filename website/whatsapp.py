@@ -173,9 +173,9 @@ def process_whatsapp_vote(poll_message_id, sender_jid, selected_options, display
     Vote.query.filter(Vote.option_id.in_(option_ids), Vote.whatsapp_sender == sender_jid).delete(synchronize_session=False)
     db.session.commit()
     
-    for opt in options:
-        opt_str = format_option_for_whatsapp(opt).strip()
-        if opt_str in selected_options:
+    if poll.poll_type == 'single' and len(options) == 1:
+        if "Ja" in selected_options:
+            opt = options[0]
             new_vote = Vote(
                 option_id=opt.id,
                 user_id=system_user.id,
@@ -184,6 +184,18 @@ def process_whatsapp_vote(poll_message_id, sender_jid, selected_options, display
                 is_whatsapp=True
             )
             db.session.add(new_vote)
+    else:
+        for opt in options:
+            opt_str = format_option_for_whatsapp(opt).strip()
+            if opt_str in selected_options:
+                new_vote = Vote(
+                    option_id=opt.id,
+                    user_id=system_user.id,
+                    user_name=display_name,
+                    whatsapp_sender=sender_jid,
+                    is_whatsapp=True
+                )
+                db.session.add(new_vote)
             
     db.session.commit()
     return True
@@ -209,12 +221,21 @@ def send_poll_view(poll_id):
         elif len(poll.options) == 0:
             flash('Diese Abstimmung hat keine Terminvorschläge!', category='error')
         else:
-            options_list = [format_option_for_whatsapp(opt) for opt in poll.options]
-            poll_name = f"⚔️ Abstimmung: {poll.title}"
-            if poll.description:
-                poll_name += f"\n{poll.description}"
+            if poll.poll_type == 'single' and len(poll.options) == 1:
+                opt = poll.options[0]
+                formatted_date = format_option_for_whatsapp(opt)
+                options_list = ["Ja", "Nein"]
+                poll_name = f"⚔️ Abstimmung: {poll.title}\nDatum: {formatted_date}"
+                if poll.description:
+                    poll_name += f"\n{poll.description}"
+                response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=False)
+            else:
+                options_list = [format_option_for_whatsapp(opt) for opt in poll.options]
+                poll_name = f"⚔️ Abstimmung: {poll.title}"
+                if poll.description:
+                    poll_name += f"\n{poll.description}"
+                response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=True)
                 
-            response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=True)
             if response and response.get('id'):
                 poll.whatsapp_poll_id = normalize_id(response.get('id'))
                 db.session.commit()
@@ -617,10 +638,17 @@ def webhook():
                     admin_user = User.query.filter_by(whatsapp_admin_chat_id=state_record.chat_id, is_admin=True).first()
                     target_chat_id = (admin_user.whatsapp_chat_id if admin_user else None) or state_record.chat_id
                     
-                    wa_options = [format_option_for_whatsapp(opt) for opt in options_list]
-                    poll_name = f"⚔️ Abstimmung: {new_poll.title}"
-                    
-                    response = wa_client.send_poll(target_chat_id, poll_name, wa_options, multiple_answers=True)
+                    if new_poll.poll_type == 'single' and len(options_list) == 1:
+                        opt = options_list[0]
+                        formatted_date = format_option_for_whatsapp(opt)
+                        wa_options = ["Ja", "Nein"]
+                        poll_name = f"⚔️ Abstimmung: {new_poll.title}\nDatum: {formatted_date}"
+                        response = wa_client.send_poll(target_chat_id, poll_name, wa_options, multiple_answers=False)
+                    else:
+                        wa_options = [format_option_for_whatsapp(opt) for opt in options_list]
+                        poll_name = f"⚔️ Abstimmung: {new_poll.title}"
+                        response = wa_client.send_poll(target_chat_id, poll_name, wa_options, multiple_answers=True)
+                        
                     if response and response.get('id'):
                         new_poll.whatsapp_poll_id = normalize_id(response.get('id'))
                         db.session.commit()
