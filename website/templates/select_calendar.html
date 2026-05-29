@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Google Kalender auswählen{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 2rem auto;">
+    <a href="/admin" class="text-muted" style="text-decoration: none; font-size: 0.9rem;">← Zurück zum Dashboard</a>
+    
+    <h1 style="margin-top: 1rem; color: var(--primary-color); font-size: 1.8rem; margin-bottom: 0.5rem;">Google Kalender verknüpfen</h1>
+    <p class="text-muted" style="margin-bottom: 1.5rem;">
+        Wähle aus, ob du einen neuen Kalender für deine Liga/TCW-Events erstellen oder einen deiner existierenden Google Kalender verwenden möchtest.
+    </p>
+
+    <form method="POST" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Option 1: Neuer Kalender -->
+        <div class="option-item" onclick="document.getElementById('opt-new').checked = true; toggleCalendarOptions();" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1.2rem;">
+            <div style="display: flex; align-items: center; width: 100%;">
+                <input type="radio" id="opt-new" name="calendar_option" value="create" checked style="margin-right: 1rem; accent-color: var(--primary-color);">
+                <label for="opt-new" style="font-weight: 600; cursor: pointer; font-size: 1.1rem; color: white;">Einen neuen Kalender erstellen</label>
+            </div>
+            <div id="new-calendar-settings" style="width: 100%; margin-top: 0.5rem; padding-left: 2.2rem;">
+                <label for="new_calendar_name" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Kalendername</label>
+                <input type="text" id="new_calendar_name" name="new_calendar_name" value="Liga Spielplan (Allgemein)" placeholder="z.B. Liga Spielplan" style="padding: 0.8rem;">
+            </div>
+        </div>
+
+        <!-- Option 2: Existierender Kalender -->
+        <div class="option-item" onclick="document.getElementById('opt-existing').checked = true; toggleCalendarOptions();" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1.2rem;">
+            <div style="display: flex; align-items: center; width: 100%;">
+                <input type="radio" id="opt-existing" name="calendar_option" value="existing" style="margin-right: 1rem; accent-color: var(--primary-color);">
+                <label for="opt-existing" style="font-weight: 600; cursor: pointer; font-size: 1.1rem; color: white;">Existierenden Kalender verwenden</label>
+            </div>
+            <div id="existing-calendar-settings" style="width: 100%; margin-top: 0.5rem; padding-left: 2.2rem; display: none;">
+                <label for="existing_calendar_id" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Kalender auswählen</label>
+                <select id="existing_calendar_id" name="existing_calendar_id" style="width: 100%; padding: 0.8rem; background-color: #1a1a1a; border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 1rem; outline: none;">
+                    {% for cal in calendars %}
+                        <option value="{{ cal.id }}" {% if user.google_calendar_id == cal.id %}selected{% endif %}>
+                            {{ cal.summary }}{% if cal.accessRole == 'owner' %} (Besitzer){% elif cal.accessRole == 'writer' %} (Schreibrechte){% endif %}
+                        </option>
+                    {% else %}
+                        <option value="" disabled>Keine Kalender gefunden</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Öffentliche Berechtigungen Checkbox -->
+        <div style="display: flex; align-items: flex-start; gap: 0.8rem; padding: 0.5rem 0.2rem;">
+            <input type="checkbox" id="make_public" name="make_public" value="y" checked style="margin-top: 0.25rem; accent-color: var(--primary-color); width: 18px; height: 18px;">
+            <label for="make_public" style="font-size: 0.9rem; color: var(--text-muted); cursor: pointer; line-height: 1.4;">
+                <strong>Kalender öffentlich lesbar machen (empfohlen)</strong><br>
+                Ermöglicht es anderen Gildenmitgliedern, die eingetragenen Termine in ihrem eigenen Kalender zu abonnieren.
+            </label>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">Speichern & Verknüpfen</button>
+            <a href="/admin" class="btn btn-outline" style="flex: 1; text-align: center;">Abbrechen</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleCalendarOptions() {
+    const isNew = document.getElementById('opt-new').checked;
+    const newSettings = document.getElementById('new-calendar-settings');
+    const existingSettings = document.getElementById('existing-calendar-settings');
+    const newNameInput = document.getElementById('new_calendar_name');
+    const existingSelect = document.getElementById('existing_calendar_id');
+    
+    if (isNew) {
+        newSettings.style.display = 'block';
+        existingSettings.style.display = 'none';
+        newNameInput.required = true;
+        existingSelect.required = false;
+    } else {
+        newSettings.style.display = 'none';
+        existingSettings.style.display = 'block';
+        newNameInput.required = false;
+        existingSelect.required = true;
+    }
+}
+
+// Initial toggle setup
+toggleCalendarOptions();
+</script>
+{% endblock %}
