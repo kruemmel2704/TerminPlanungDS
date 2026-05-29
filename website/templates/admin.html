@@ -10,6 +10,15 @@
                 <strong>Google Kalender Status:</strong> 
                 {% if user.google_token %}
                     <span style="color: #4caf50;">Verknüpft ✅</span>
+                    {% if user.google_calendar_name %}
+                        <span style="color: var(--text-muted); margin-left: 0.5rem;">(Kalender: <strong>{{ user.google_calendar_name }}</strong>)</span>
+                    {% elif user.google_calendar_id %}
+                        <span style="color: var(--text-muted); margin-left: 0.5rem;">(Kalender ID: <strong>{{ user.google_calendar_id }}</strong>)</span>
+                    {% endif %}
+                    <div style="margin-top: 0.8rem; display: flex; gap: 0.8rem;">
+                        <a href="/admin/select-calendar" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Kalender verwalten</a>
+                        <a href="/admin/disconnect-google" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: #f44336; color: #f44336;">Verbindung trennen</a>
+                    </div>
                 {% else %}
                     <span style="color: #f44336;">Nicht verknüpft ❌</span>
                     <a href="/admin/connect-google" class="btn btn-outline" style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.8rem;">Jetzt verknüpfen</a>

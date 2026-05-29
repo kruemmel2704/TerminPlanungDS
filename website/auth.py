@@ -148,8 +148,80 @@ def google_callback():
     })
     
     db.session.commit()
-    flash('Google Kalender erfolgreich verknüpft!', category='success')
+    return redirect(url_for('auth.select_calendar'))
+
+@auth.route('/admin/select-calendar', methods=['GET', 'POST'])
+@login_required
+def select_calendar():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+    
+    if not current_user.google_token:
+        flash('Bitte verknüpfe zuerst deinen Google Kalender.', category='error')
+        return redirect(url_for('routes.admin_dashboard'))
+    
+    from .calendar_utils import get_calendar_list, create_league_calendar, get_calendar_service
+    
+    if request.method == 'POST':
+        option = request.form.get('calendar_option')
+        make_public = request.form.get('make_public') == 'y'
+        
+        if option == 'create':
+            name = request.form.get('new_calendar_name', 'Liga Spielplan (Allgemein)')
+            cal_id = create_league_calendar(current_user, summary=name, make_public=make_public)
+            if cal_id:
+                current_user.google_calendar_id = cal_id
+                current_user.google_calendar_name = name
+                db.session.commit()
+                flash(f'Neuer Kalender "{name}" wurde erfolgreich erstellt und verknüpft!', category='success')
+                return redirect(url_for('routes.admin_dashboard'))
+            else:
+                flash('Fehler beim Erstellen des neuen Kalenders.', category='error')
+        
+        elif option == 'existing':
+            cal_id = request.form.get('existing_calendar_id')
+            if not cal_id:
+                flash('Bitte wähle einen existierenden Kalender aus!', category='error')
+                return redirect(url_for('auth.select_calendar'))
+            
+            service = get_calendar_service(current_user)
+            summary = "Google Kalender"
+            if service:
+                try:
+                    cal_meta = service.calendars().get(calendarId=cal_id).execute()
+                    summary = cal_meta.get('summary', 'Google Kalender')
+                    
+                    if make_public:
+                        rule = {
+                            'scope': {'type': 'default'},
+                            'role': 'reader'
+                        }
+                        service.acl().insert(calendarId=cal_id, body=rule).execute()
+                except Exception as e:
+                    print(f"Error fetching/updating existing calendar: {e}")
+            
+            current_user.google_calendar_id = cal_id
+            current_user.google_calendar_name = summary
+            db.session.commit()
+            flash(f'Erfolgreich mit dem Kalender "{summary}" verknüpft!', category='success')
+            return redirect(url_for('routes.admin_dashboard'))
+            
+    calendars = get_calendar_list(current_user)
+    return render_template('select_calendar.html', calendars=calendars, user=current_user)
+
+@auth.route('/admin/disconnect-google')
+@login_required
+def disconnect_google():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+    
+    current_user.google_token = None
+    current_user.google_calendar_id = None
+    current_user.google_calendar_name = None
+    db.session.commit()
+    flash('Verbindung mit Google Kalender wurde getrennt.', category='success')
     return redirect(url_for('routes.admin_dashboard'))
+
 
 @auth.route('/logout')
 @login_required
