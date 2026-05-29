@@ -570,7 +570,9 @@ def webhook():
                 "Suchen noch TCW" in body_lower or
                 "Habt ihr noch TCW" in body_lower or
                 "Suchen TCW" in body_lower or
-                "Sucht TCW" in body_lower
+                "Sucht TCW" in body_lower or
+                "Suche" in body_lower or
+                "suche" in body_lower
             )
             if is_query:
                 search = WhatsAppSearch.query.first()
