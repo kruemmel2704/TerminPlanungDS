@@ -1021,7 +1021,7 @@ def start_reminder_scheduler(app):
                                 
                             search.last_sent_at = now_utc
                             db.session.commit()
-                            print("Sent hourly search post to groups.")
+                            print("Sent hourly search post to groups. Active search in progress.")
                 
                 # Sleep 60 seconds to avoid repeating within the same hour
                 time.sleep(60)
