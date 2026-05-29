@@ -306,7 +306,25 @@ def webhook():
         
         # Check if the chat where the message was received is a configured admin chat
         admin_user = User.query.filter_by(whatsapp_admin_chat_id=chat_id, is_admin=True).first()
-        
+
+        # If this is from an admin chat, check if they are replying to an opponent message
+        if admin_user:
+            reply_to = payload.get('replyTo')
+            if reply_to:
+                quoted_body = reply_to.get('body') or ""
+                if "[Opponent: " in quoted_body and "]" in quoted_body:
+                    try:
+                        opponent_jid = quoted_body.split("[Opponent: ")[1].split("]")[0].strip()
+                        if opponent_jid:
+                            success = wa_client.send_message(opponent_jid, body)
+                            if success:
+                                wa_client.send_message(chat_id, "✅ Nachricht an den Gegner weitergeleitet.", reply_to=payload.get('id'))
+                            else:
+                                wa_client.send_message(chat_id, "❌ Fehler beim Weiterleiten an den Gegner.", reply_to=payload.get('id'))
+                            return jsonify({"status": "success"}), 200
+                    except Exception as e:
+                        print(f"Error forwarding admin reply: {e}")
+
         # Check if the admin sent /abstimmung
         if body.lower() == '/abstimmung':
             if not admin_user:
@@ -546,7 +564,7 @@ def webhook():
             wa_client.send_message(chat_id, "⏹️ *Suche wurde beendet.*")
             return jsonify({"status": "success"}), 200
 
-        # Check if it is a user DM (not a group chat) and matches keywords
+        # Check if it is a user DM (not a group chat)
         if not chat_id.endswith('@g.us'):
             body_lower = body.lower()
             import re
@@ -559,42 +577,40 @@ def webhook():
                 "sucht ihr" in body_lower or
                 "suchen noch" in body_lower or
                 "habt ihr noch" in body_lower or
-                "suchen" in body_lower or
-                "sucht" in body_lower or
-                "Sucht ihr" in body_lower or
-                "Suchen noch" in body_lower or
-                "Habt ihr noch" in body_lower or
-                "Suchen" in body_lower or
-                "Sucht" in body_lower or
-                "Sucht ihr TCW" in body_lower or
-                "Suchen noch TCW" in body_lower or
-                "Habt ihr noch TCW" in body_lower or
-                "Suchen TCW" in body_lower or
-                "Sucht TCW" in body_lower or
-                "Suche" in body_lower or
                 "suche" in body_lower
             )
-            if is_query:
-                search = WhatsAppSearch.query.first()
-                if search and search.is_active:
+            
+            search = WhatsAppSearch.query.first()
+            search_active = search and search.is_active
+            
+            if search_active:
+                contact_name = None
+                contact_data = wa_client.get_contact(sender_jid)
+                if contact_data:
+                    contact_name = contact_data.get('name') or contact_data.get('pushname') or contact_data.get('shortName')
+                
+                phone = sender_jid.split('@')[0]
+                display_name = f"{contact_name} (+{phone})" if contact_name else f"+{phone}"
+                
+                if is_query:
                     wa_client.send_message(chat_id, "Ja ein Teammitglied wird sich bald melden für weitere details.")
                     
                     # Notify admin chat
                     admin_users = User.query.filter(User.whatsapp_admin_chat_id != None, User.is_admin == True).all()
                     for admin in admin_users:
-                        contact_name = None
-                        contact_data = wa_client.get_contact(sender_jid)
-                        if contact_data:
-                            contact_name = contact_data.get('name') or contact_data.get('pushname') or contact_data.get('shortName')
-                        
-                        phone = sender_jid.split('@')[0]
-                        display_name = f"{contact_name} (+{phone})" if contact_name else f"+{phone}"
-                        
-                        admin_msg = f"🔔 *Es wurde eine Spielmöglichkeit gefunden!*\n\nAnfrage von: {display_name}\nNachricht: \"{body}\""
+                        admin_msg = f"🔔 *Es wurde eine Spielmöglichkeit gefunden!*\n\nAnfrage von: {display_name}\nNachricht: \"{body}\"\n\n👉 Antworte (zitiere) auf diese Nachricht, um dem Gegner zu schreiben.\n[Opponent: {sender_jid}]"
                         wa_client.send_message(admin.whatsapp_admin_chat_id, admin_msg)
                 else:
-                    wa_client.send_message(chat_id, "Tut uns leid wir haben schon ein Match gefunden.")
+                    # Just forward the message to admin chat
+                    admin_users = User.query.filter(User.whatsapp_admin_chat_id != None, User.is_admin == True).all()
+                    for admin in admin_users:
+                        admin_msg = f"💬 *Nachricht von Gegner* ({display_name}):\n\"{body}\"\n\n👉 Antworte (zitiere) auf diese Nachricht, um zu schreiben.\n[Opponent: {sender_jid}]"
+                        wa_client.send_message(admin.whatsapp_admin_chat_id, admin_msg)
                 return jsonify({"status": "success"}), 200
+            else:
+                if is_query:
+                    wa_client.send_message(chat_id, "Tut uns leid wir haben schon ein Match gefunden.")
+                    return jsonify({"status": "success"}), 200
 
         # If not /abstimmung, check if this chat has an active setup state
         state_record = WhatsAppState.query.filter_by(chat_id=chat_id).first()
