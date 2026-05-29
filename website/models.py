@@ -15,6 +15,7 @@ class User(db.Model, UserMixin):
     whatsapp_chat_name = db.Column(db.String(200), nullable=True)
     whatsapp_admin_chat_id = db.Column(db.String(100), nullable=True)
     whatsapp_admin_chat_name = db.Column(db.String(200), nullable=True)
+    whatsapp_search_groups = db.Column(db.Text, nullable=True)
 
 class Poll(db.Model):
     id = db.Column(db.Integer, primary_key=True)
