@@ -546,8 +546,8 @@ def webhook():
             wa_client.send_message(chat_id, "⏹️ *Suche wurde beendet.*")
             return jsonify({"status": "success"}), 200
 
-        # Check if it is a user DM (ends with @c.us) and matches keywords
-        if chat_id.endswith('@c.us'):
+        # Check if it is a user DM (not a group chat) and matches keywords
+        if not chat_id.endswith('@g.us'):
             body_lower = body.lower()
             import re
             words = re.findall(r'\b\w+\b', body_lower)
