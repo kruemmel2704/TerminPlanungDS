@@ -79,3 +79,11 @@ class WhatsAppState(db.Model):
     dates = db.Column(db.Text, nullable=True) # JSON string of generated options: [[start_time, end_time], ...]
     whatsapp_poll_id = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class WhatsAppSearch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    groups = db.Column(db.Text, nullable=True) # JSON list of group JIDs
+    last_sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
