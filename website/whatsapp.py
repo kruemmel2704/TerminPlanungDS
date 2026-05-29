@@ -169,7 +169,7 @@ def send_search_post_now(groups_list):
                 filename="tcw_sticker.png",
                 base64_data=sticker_base64
             )
-        wa_client.send_message(group_id, "wir suchen heute abend ein TCW um 20:30")
+        wa_client.send_message(group_id, "Deadshot Syndicate sucht ein Cw 4vs4 SnD HC heute um 20:30 Uhr ihr habt interesse? meldet euch")
 
 DE_DAYS = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
 
