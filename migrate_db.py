@@ -9,7 +9,8 @@ def migrate():
         new_columns = [
             ('whatsapp_chat_id', 'VARCHAR(100)'),
             ('whatsapp_chat_name', 'VARCHAR(200)'),
-            ('google_calendar_name', 'VARCHAR(200)')
+            ('google_calendar_name', 'VARCHAR(200)'),
+            ('whatsapp_search_groups', 'TEXT')
         ]
         
         # Determine the database type

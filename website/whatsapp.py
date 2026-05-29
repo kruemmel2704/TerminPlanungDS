@@ -80,6 +80,19 @@ def set_admin_chat():
         
     return redirect(url_for('whatsapp.dashboard'))
 
+@whatsapp.route('/whatsapp/set_search_groups', methods=['POST'])
+@login_required
+def set_search_groups():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    selected_groups = request.form.getlist('search_groups')
+    current_user.whatsapp_search_groups = json.dumps(selected_groups)
+    db.session.commit()
+    
+    flash('Vordefinierte Gruppen für die Suche wurden gespeichert.', category='success')
+    return redirect(url_for('whatsapp.dashboard'))
+
 @whatsapp.route('/whatsapp/logout')
 @login_required
 def logout():
@@ -446,6 +459,39 @@ def webhook():
             # Clear any existing state for this chat
             WhatsAppState.query.filter_by(chat_id=chat_id).delete()
             db.session.commit()
+
+            # Check for predefined groups
+            predefined_groups = []
+            if admin_user.whatsapp_search_groups:
+                try:
+                    predefined_groups = json.loads(admin_user.whatsapp_search_groups)
+                except Exception:
+                    pass
+
+            if predefined_groups:
+                search = WhatsAppSearch.query.first()
+                if not search:
+                    search = WhatsAppSearch()
+                    db.session.add(search)
+
+                search.is_active = True
+                search.groups = json.dumps(predefined_groups)
+                search.last_sent_at = datetime.utcnow()
+                db.session.commit()
+
+                # Get names for confirmation
+                all_groups = wa_client.get_groups()
+                group_names = []
+                for gid in predefined_groups:
+                    matched = next((g['groupName'] for g in all_groups if g['id'] == gid), None)
+                    group_names.append(matched or gid)
+
+                groups_str = ", ".join(group_names)
+                wa_client.send_message(chat_id, f"✅ *Suche wurde gestartet!*\n\nGruppen (Vordefiniert):\n{groups_str}\n\nDer Bot postet nun stündlich die Suchanfrage in diese Gruppen.")
+                
+                # Trigger search post immediately
+                send_search_post_now(predefined_groups)
+                return jsonify({"status": "success"}), 200
 
             groups = wa_client.get_groups()
             groups = [g for g in groups if g['id'].endswith('@g.us')]
