@@ -577,7 +577,16 @@ def webhook():
                 "sucht ihr" in body_lower or
                 "suchen noch" in body_lower or
                 "habt ihr noch" in body_lower or
-                "suche" in body_lower
+                "suche" in body_lower or
+                "interresse" in body_lower or
+                "wir hätten" in body_lower or
+                "seit" in body_lower or
+                "sucht" in body_lower or
+                "suchen" in body_lower or
+                "habt" in body_lower or
+                "interresse" in body_lower or
+                "hätte " in body_lower or
+                "zu wann" in body_lower
             )
             
             search = WhatsAppSearch.query.first()
