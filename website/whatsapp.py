@@ -558,7 +558,19 @@ def webhook():
                 "spielmöglichkeit" in body_lower or
                 "sucht ihr" in body_lower or
                 "suchen noch" in body_lower or
-                "habt ihr noch" in body_lower
+                "habt ihr noch" in body_lower or
+                "suchen" in body_lower or
+                "sucht" in body_lower or
+                "Sucht ihr" in body_lower or
+                "Suchen noch" in body_lower or
+                "Habt ihr noch" in body_lower or
+                "Suchen" in body_lower or
+                "Sucht" in body_lower or
+                "Sucht ihr TCW" in body_lower or
+                "Suchen noch TCW" in body_lower or
+                "Habt ihr noch TCW" in body_lower or
+                "Suchen TCW" in body_lower or
+                "Sucht TCW" in body_lower
             )
             if is_query:
                 search = WhatsAppSearch.query.first()
