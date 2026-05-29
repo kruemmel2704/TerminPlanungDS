@@ -543,14 +543,23 @@ def webhook():
             search.is_active = False
             db.session.commit()
 
-            wa_client.send_message(chat_id, "Tut uns leid wir haben schon ein Match gefunden.")
             wa_client.send_message(chat_id, "⏹️ *Suche wurde beendet.*")
             return jsonify({"status": "success"}), 200
 
         # Check if it is a user DM (ends with @c.us) and matches keywords
         if chat_id.endswith('@c.us'):
             body_lower = body.lower()
-            is_query = any(phrase in body_lower for phrase in ["sucht ihr", "suchen noch", "tcw?", "cw?", "sucht ihr tcw", "sucht ihr cw", "spielmöglichkeit", "suchen noch tcw", "habt ihr noch tcw"])
+            import re
+            words = re.findall(r'\b\w+\b', body_lower)
+            is_query = (
+                "tcw" in words or
+                "cw" in words or
+                "gegner" in words or
+                "spielmöglichkeit" in body_lower or
+                "sucht ihr" in body_lower or
+                "suchen noch" in body_lower or
+                "habt ihr noch" in body_lower
+            )
             if is_query:
                 search = WhatsAppSearch.query.first()
                 if search and search.is_active:
