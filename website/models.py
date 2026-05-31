@@ -88,3 +88,14 @@ class WhatsAppSearch(db.Model):
     last_sent_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+class WhatsAppRecruitment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    message = db.Column(db.Text, nullable=True)
+    groups = db.Column(db.Text, nullable=True) # JSON list of group JIDs
+    last_sent_at_12 = db.Column(db.DateTime, nullable=True)
+    last_sent_at_18 = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
