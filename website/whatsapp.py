@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from .whatsapp_utils import WhatsAppClient, normalize_id
-from .models import Poll, Option, Vote, User, WhatsAppState, WhatsAppSearch
+from .models import Poll, Option, Vote, User, WhatsAppState, WhatsAppSearch, WhatsAppRecruitment
 from . import db
 from datetime import datetime, timedelta
 import json
@@ -33,11 +33,19 @@ def dashboard():
     if state in ['online', 'authorized']:
         groups = wa_client.get_groups()
 
+    recruitment = WhatsAppRecruitment.query.first()
+    if not recruitment:
+        recruitment = WhatsAppRecruitment(is_active=False, message="", groups="[]")
+        db.session.add(recruitment)
+        db.session.commit()
+
     return render_template("whatsapp.html", 
                            status=state, 
                            qr_data=qr_data, 
                            groups=groups,
+                           recruitment=recruitment,
                            user=current_user)
+
 
 @whatsapp.route('/whatsapp/set_default', methods=['POST'])
 @login_required
@@ -92,6 +100,60 @@ def set_search_groups():
     
     flash('Vordefinierte Gruppen für die Suche wurden gespeichert.', category='success')
     return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/set_recruitment', methods=['POST'])
+@login_required
+def set_recruitment():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    is_active = bool(request.form.get('is_active'))
+    message = request.form.get('message') or ""
+    selected_groups = request.form.getlist('recruitment_groups')
+    
+    recruitment = WhatsAppRecruitment.query.first()
+    if not recruitment:
+        recruitment = WhatsAppRecruitment()
+        db.session.add(recruitment)
+        
+    recruitment.is_active = is_active
+    recruitment.message = message
+    recruitment.groups = json.dumps(selected_groups)
+    db.session.commit()
+    
+    flash('Anwerbe-Einstellungen wurden gespeichert.', category='success')
+    return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/test_recruitment', methods=['POST'])
+@login_required
+def test_recruitment():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    message = request.form.get('message') or ""
+    selected_groups = request.form.getlist('recruitment_groups')
+    
+    if not message:
+        flash('Bitte gib einen Anwerbe-Text ein!', category='error')
+        return redirect(url_for('whatsapp.dashboard'))
+        
+    if not selected_groups:
+        flash('Bitte wähle mindestens eine Empfänger-Gruppe aus!', category='error')
+        return redirect(url_for('whatsapp.dashboard'))
+        
+    success_count = 0
+    for group_id in selected_groups:
+        success = wa_client.send_message(group_id, message)
+        if success:
+            success_count += 1
+            
+    if success_count > 0:
+        flash(f'Test-Nachricht wurde erfolgreich an {success_count} Gruppe(n) gesendet!', category='success')
+    else:
+        flash('Fehler beim Senden der Test-Nachricht. Bitte überprüfe die WhatsApp-Verbindung.', category='error')
+        
+    return redirect(url_for('whatsapp.dashboard'))
+
 
 @whatsapp.route('/whatsapp/logout')
 @login_required
@@ -1005,6 +1067,47 @@ def start_reminder_scheduler(app):
                                     print(f"Sent daily reminder for poll {poll.id} as a reply to {poll.whatsapp_poll_id}")
                                 else:
                                     print(f"Failed to send daily reminder for poll {poll.id}")
+                
+                # Check for scheduled recruitment messages (12:00 and 18:00 UTC+1)
+                if now.hour in [12, 18]:
+                    with app.app_context():
+                        from .models import WhatsAppRecruitment
+                        recruitment = WhatsAppRecruitment.query.first()
+                        if recruitment and recruitment.is_active and recruitment.message:
+                            try:
+                                groups_list = json.loads(recruitment.groups or "[]")
+                            except Exception:
+                                groups_list = []
+                            
+                            if groups_list:
+                                should_send = False
+                                now_utc = datetime.utcnow()
+                                
+                                if now.hour == 12:
+                                    if not recruitment.last_sent_at_12:
+                                        should_send = True
+                                    else:
+                                        last_sent_12_utc_plus_1 = recruitment.last_sent_at_12.replace(tzinfo=timezone.utc).astimezone(tz_utc_plus_1)
+                                        if last_sent_12_utc_plus_1.date() != now.date():
+                                            should_send = True
+                                elif now.hour == 18:
+                                    if not recruitment.last_sent_at_18:
+                                        should_send = True
+                                    else:
+                                        last_sent_18_utc_plus_1 = recruitment.last_sent_at_18.replace(tzinfo=timezone.utc).astimezone(tz_utc_plus_1)
+                                        if last_sent_18_utc_plus_1.date() != now.date():
+                                            should_send = True
+                                            
+                                if should_send:
+                                    print(f"Sending scheduled recruitment message at {now.hour}:00 UTC+1 to groups: {groups_list}")
+                                    for g_id in groups_list:
+                                        wa_client.send_message(g_id, recruitment.message)
+                                    
+                                    if now.hour == 12:
+                                        recruitment.last_sent_at_12 = now_utc
+                                    else:
+                                        recruitment.last_sent_at_18 = now_utc
+                                    db.session.commit()
                 
                 # Check for active TCW searches
                 with app.app_context():

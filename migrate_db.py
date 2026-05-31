@@ -160,6 +160,40 @@ def migrate():
             else:
                 print(f"Error adding whatsapp_admin_chat_name column to user table: {e}")
 
+        # Create whatsapp_recruitment table if not exists
+        try:
+            print("Creating whatsapp_recruitment table...")
+            if dialect == 'sqlite':
+                db.session.execute(text("""
+                    CREATE TABLE IF NOT EXISTS whatsapp_recruitment (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        is_active BOOLEAN NOT NULL DEFAULT 0,
+                        message TEXT,
+                        groups TEXT,
+                        last_sent_at_12 DATETIME,
+                        last_sent_at_18 DATETIME,
+                        created_at DATETIME
+                    )
+                """))
+            else:
+                db.session.execute(text("""
+                    CREATE TABLE IF NOT EXISTS whatsapp_recruitment (
+                        id SERIAL PRIMARY KEY,
+                        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+                        message TEXT,
+                        groups TEXT,
+                        last_sent_at_12 TIMESTAMP,
+                        last_sent_at_18 TIMESTAMP,
+                        created_at TIMESTAMP
+                    )
+                """))
+            db.session.commit()
+            print("Successfully checked/created whatsapp_recruitment table.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating whatsapp_recruitment table: {e}")
+
+
 
 if __name__ == "__main__":
     migrate()
