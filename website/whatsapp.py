@@ -1008,6 +1008,44 @@ def webhook():
     return jsonify({"status": "ignored"}), 200
 
 
+@whatsapp.route('/api/whatsapp/chats', methods=['GET'])
+def api_get_chats():
+    import os
+    api_key = request.headers.get('X-Api-Key') or request.args.get('api_key')
+    expected_key = os.getenv('INTERNAL_API_KEY')
+    if expected_key and api_key != expected_key:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    status_resp = wa_client.get_status()
+    state = status_resp.get('stateInstance')
+    if state not in ['online', 'authorized']:
+        return jsonify({"status": "error", "message": "WhatsApp client is not connected.", "state": state}), 400
+        
+    groups = wa_client.get_groups()
+    return jsonify({"status": "success", "chats": groups})
+
+
+@whatsapp.route('/api/whatsapp/send', methods=['POST'])
+def api_send_message():
+    import os
+    api_key = request.headers.get('X-Api-Key') or request.args.get('api_key')
+    expected_key = os.getenv('INTERNAL_API_KEY')
+    if expected_key and api_key != expected_key:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    data = request.json or {}
+    chat_id = data.get('chat_id')
+    message = data.get('message')
+    if not chat_id or not message:
+        return jsonify({"status": "error", "message": "Missing chat_id or message"}), 400
+        
+    success = wa_client.send_message(chat_id, message)
+    if success:
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"status": "error", "message": "Failed to send message via WhatsApp"}), 500
+
+
 def start_reminder_scheduler(app):
     import threading
     import time
