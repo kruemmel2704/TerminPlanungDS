@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, make_response
 from flask_login import login_required, current_user
 from .whatsapp_utils import WhatsAppClient, normalize_id
 from .models import Poll, Option, Vote, User, WhatsAppState, WhatsAppSearch, WhatsAppRecruitment
@@ -1044,6 +1044,38 @@ def api_send_message():
         return jsonify({"status": "success"})
     else:
         return jsonify({"status": "error", "message": "Failed to send message via WhatsApp"}), 500
+
+
+@whatsapp.route('/api/polls/active', methods=['GET', 'OPTIONS'])
+def api_get_active_polls():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        return response
+        
+    active_polls = Poll.query.filter_by(is_active=True).all()
+    polls_data = []
+    for poll in active_polls:
+        options_data = []
+        for opt in poll.options:
+            options_data.append({
+                "id": opt.id,
+                "start_time": opt.start_time.isoformat(),
+                "end_time": opt.end_time.isoformat()
+            })
+        polls_data.append({
+            "id": poll.id,
+            "title": poll.title,
+            "description": poll.description,
+            "deadline": poll.deadline.isoformat() if poll.deadline else None,
+            "poll_type": poll.poll_type,
+            "options": options_data
+        })
+    response = jsonify({"status": "success", "polls": polls_data})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response
 
 
 def start_reminder_scheduler(app):
