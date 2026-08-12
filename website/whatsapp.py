@@ -675,6 +675,146 @@ def webhook():
     return jsonify({"status": "ignored"}), 200
 
 
+# --- REST API ENDPOINTS FOR REACT ---
+
+@whatsapp.route('/api/whatsapp/status')
+@login_required
+def api_whatsapp_status():
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    if not wa_client.is_configured():
+        return jsonify({
+            'configured': False,
+            'status': 'unconfigured',
+            'qr_data': None,
+            'groups': []
+        })
+        
+    state_resp = wa_client.get_status()
+    state = state_resp.get('stateInstance')
+    
+    qr_data = None
+    if state == 'notAuthorized':
+        qr_resp = wa_client.get_qr_code()
+        if qr_resp:
+            qr_data = qr_resp.get('message')
+            
+    groups = []
+    if state in ['online', 'authorized']:
+        groups = wa_client.get_groups()
+        
+    return jsonify({
+        'configured': True,
+        'status': state,
+        'qr_data': qr_data,
+        'groups': [{
+            'id': g.get('id'),
+            'name': g.get('name')
+        } for g in groups]
+    })
+
+@whatsapp.route('/api/whatsapp/set_default', methods=['POST'])
+@login_required
+def api_set_default_chat():
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    data = request.json
+    chat_id = data.get('chat_id')
+    chat_name = data.get('chat_name')
+    
+    if chat_id:
+        current_user.whatsapp_chat_id = chat_id
+        current_user.whatsapp_chat_name = chat_name
+        db.session.commit()
+        return jsonify({'message': f'Standard-Chat "{chat_name}" wurde gespeichert.'})
+    return jsonify({'message': 'Fehler beim Speichern des Standard-Chats.'}), 400
+
+@whatsapp.route('/api/whatsapp/set_admin_chat', methods=['POST'])
+@login_required
+def api_set_admin_chat():
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    data = request.json
+    chat_id = data.get('admin_chat_id')
+    chat_name = data.get('admin_chat_name')
+    
+    if chat_id:
+        current_user.whatsapp_admin_chat_id = chat_id
+        current_user.whatsapp_admin_chat_name = chat_name
+        db.session.commit()
+        return jsonify({'message': f'Admin-Chat "{chat_name}" wurde gespeichert.'})
+    else:
+        current_user.whatsapp_admin_chat_id = None
+        current_user.whatsapp_admin_chat_name = None
+        db.session.commit()
+        return jsonify({'message': 'Admin-Chat wurde entfernt.'})
+
+@whatsapp.route('/api/whatsapp/logout', methods=['POST'])
+@login_required
+def api_whatsapp_logout():
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    if wa_client.logout():
+        return jsonify({'message': 'Erfolgreich von WhatsApp abgemeldet.'})
+    return jsonify({'message': 'Fehler beim Abmelden.'}), 500
+
+@whatsapp.route('/api/whatsapp/share/<int:poll_id>', methods=['POST'])
+@login_required
+def api_share_poll(poll_id):
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    poll = Poll.query.get_or_404(poll_id)
+    
+    status_resp = wa_client.get_status()
+    state = status_resp.get('stateInstance')
+    if state not in ['online', 'authorized']:
+        return jsonify({'message': 'Bitte verbinde zuerst deinen WhatsApp Account!'}), 400
+        
+    chat_id = current_user.whatsapp_chat_id
+    if not chat_id:
+        return jsonify({'message': 'Kein Standard-Chat in den Einstellungen festgelegt!'}), 400
+        
+    data = request.json or {}
+    wa_message = data.get('message')
+    
+    if wa_message:
+        vote_url = request.host_url + f"#/vote/{poll.id}"
+        message = f"🔔 *Reminder: Abstimmung für {poll.title}*\n\n{wa_message}\n\nAbstimmungs-Link:\n{vote_url}"
+        if wa_client.send_message(chat_id, message, reply_to=poll.whatsapp_poll_id):
+            return jsonify({'message': 'Reminder erfolgreich gesendet!'})
+        return jsonify({'message': 'Fehler beim Senden des Reminders.'}), 500
+        
+    if len(poll.options) == 0:
+        return jsonify({'message': 'Diese Abstimmung hat keine Terminvorschläge!'}), 400
+        
+    if poll.poll_type == 'single' and len(poll.options) == 1:
+        opt = poll.options[0]
+        formatted_date = format_option_for_whatsapp(opt)
+        options_list = ["Ja", "Nein"]
+        poll_name = f"⚔️ Abstimmung: {poll.title}\nDatum: {formatted_date}"
+        if poll.description:
+            poll_name += f"\n{poll.description}"
+        response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=False)
+    else:
+        options_list = [format_option_for_whatsapp(opt) for opt in poll.options]
+        poll_name = f"⚔️ Abstimmung: {poll.title}"
+        if poll.description:
+            poll_name += f"\n{poll.description}"
+        response = wa_client.send_poll(chat_id, poll_name, options_list, multiple_answers=True)
+        
+    if response and response.get('id'):
+        poll.whatsapp_poll_id = normalize_id(response.get('id'))
+        db.session.commit()
+        return jsonify({'message': 'WhatsApp-Umfrage wurde erfolgreich gestartet!'})
+    else:
+        return jsonify({'message': 'Fehler beim Starten der WhatsApp-Umfrage.'}), 500
+
+
 def start_reminder_scheduler(app):
     import threading
     import time

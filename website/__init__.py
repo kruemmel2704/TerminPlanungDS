@@ -11,13 +11,17 @@ db = SQLAlchemy()
 DB_NAME = "database.db"
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', f'sqlite:///{DB_NAME}')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['PREFERRED_URL_SCHEME'] = 'https'
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
     db.init_app(app)
+
+    @app.route('/')
+    def index():
+        return app.send_static_file('index.html')
 
     from .routes import routes
     from .auth import auth

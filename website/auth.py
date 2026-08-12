@@ -106,20 +106,20 @@ def discord_callback():
     db.session.commit()
     login_user(user, remember=True)
     
-    return redirect(url_for('routes.home'))
+    return redirect('/')
 
 @auth.route('/login-page')
 def login_page():
     if current_user.is_authenticated:
-        return redirect(url_for('routes.home'))
-    return render_template('login.html', user=current_user)
+        return redirect('/')
+    return redirect('/#/login')
 
 # --- GOOGLE CALENDAR AUTH ---
 @auth.route('/admin/connect-google')
 @login_required
 def connect_google():
     if not current_user.is_admin:
-        return redirect(url_for('routes.home'))
+        return redirect('/')
     
     flow = get_google_flow()
     authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
@@ -131,7 +131,7 @@ def connect_google():
 @login_required
 def google_callback():
     if not current_user.is_admin:
-        return redirect(url_for('routes.home'))
+        return redirect('/')
 
     flow = get_google_flow()
     flow.code_verifier = session.get('google_code_verifier')
@@ -149,10 +149,39 @@ def google_callback():
     
     db.session.commit()
     flash('Google Kalender erfolgreich verknüpft!', category='success')
-    return redirect(url_for('routes.admin_dashboard'))
+    return redirect('/#/admin')
 
 @auth.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('auth.login_page'))
+    return redirect('/#/login')
+
+@auth.route('/api/auth/status')
+def auth_status():
+    from flask import jsonify
+    if current_user.is_authenticated:
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'id': current_user.id,
+                'discord_id': current_user.discord_id,
+                'username': current_user.username,
+                'avatar': current_user.avatar,
+                'is_admin': current_user.is_admin,
+                'whatsapp_chat_id': current_user.whatsapp_chat_id,
+                'whatsapp_chat_name': current_user.whatsapp_chat_name,
+                'whatsapp_admin_chat_id': current_user.whatsapp_admin_chat_id,
+                'whatsapp_admin_chat_name': current_user.whatsapp_admin_chat_name,
+                'google_calendar_id': current_user.google_calendar_id,
+                'google_token': current_user.google_token
+            }
+        })
+    return jsonify({'authenticated': False})
+
+@auth.route('/api/auth/logout')
+@login_required
+def api_logout():
+    from flask import jsonify
+    logout_user()
+    return jsonify({'success': True})
