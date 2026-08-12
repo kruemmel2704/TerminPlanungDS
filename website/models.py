@@ -10,10 +10,12 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, default=False)
     google_token = db.Column(db.Text)  # Store JSON serialized token for Calendar
     google_calendar_id = db.Column(db.String(200), nullable=True) # Persistent calendar ID
+    google_calendar_name = db.Column(db.String(200), nullable=True) # Persistent calendar name
     whatsapp_chat_id = db.Column(db.String(100), nullable=True)
     whatsapp_chat_name = db.Column(db.String(200), nullable=True)
     whatsapp_admin_chat_id = db.Column(db.String(100), nullable=True)
     whatsapp_admin_chat_name = db.Column(db.String(200), nullable=True)
+    whatsapp_search_groups = db.Column(db.Text, nullable=True)
 
 class Poll(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -78,3 +80,22 @@ class WhatsAppState(db.Model):
     dates = db.Column(db.Text, nullable=True) # JSON string of generated options: [[start_time, end_time], ...]
     whatsapp_poll_id = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class WhatsAppSearch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    groups = db.Column(db.Text, nullable=True) # JSON list of group JIDs
+    last_sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class WhatsAppRecruitment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    message = db.Column(db.Text, nullable=True)
+    groups = db.Column(db.Text, nullable=True) # JSON list of group JIDs
+    last_sent_at_12 = db.Column(db.DateTime, nullable=True)
+    last_sent_at_18 = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+

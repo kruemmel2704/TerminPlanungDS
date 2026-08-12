@@ -21,30 +21,49 @@ def get_calendar_service(user):
     
     return build('calendar', 'v3', credentials=credentials)
 
-def create_league_calendar(user):
+def get_calendar_list(user):
+    service = get_calendar_service(user)
+    if not service:
+        return []
+    try:
+        calendar_list = service.calendarList().list().execute()
+        return calendar_list.get('items', [])
+    except RefreshError:
+        user.google_token = None
+        user.google_calendar_id = None
+        user.google_calendar_name = None
+        db.session.commit()
+        return []
+    except Exception as e:
+        print(f"Failed to fetch calendar list: {e}")
+        return []
+
+def create_league_calendar(user, summary='Liga Spielplan (Allgemein)', make_public=True):
     service = get_calendar_service(user)
     if not service:
         return None
     
     calendar = {
-        'summary': 'Liga Spielplan (Allgemein)',
+        'summary': summary,
         'timeZone': 'Europe/Berlin'
     }
     
     try:
         created_calendar = service.calendars().insert(body=calendar).execute()
         
-        # Make calendar public
-        rule = {
-            'scope': {'type': 'default'},
-            'role': 'reader'
-        }
-        service.acl().insert(calendarId=created_calendar['id'], body=rule).execute()
+        if make_public:
+            # Make calendar public
+            rule = {
+                'scope': {'type': 'default'},
+                'role': 'reader'
+            }
+            service.acl().insert(calendarId=created_calendar['id'], body=rule).execute()
         
         return created_calendar['id']
     except RefreshError:
         user.google_token = None
         user.google_calendar_id = None
+        user.google_calendar_name = None
         db.session.commit()
         return None
     except Exception as e:
@@ -82,6 +101,7 @@ def add_event_to_calendar(user, option, title, description=""):
     except RefreshError:
         user.google_token = None
         user.google_calendar_id = None
+        user.google_calendar_name = None
         db.session.commit()
         return False
     except Exception as e:

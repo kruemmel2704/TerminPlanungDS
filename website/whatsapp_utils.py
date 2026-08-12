@@ -236,6 +236,32 @@ class WhatsAppClient:
             print(f"Error getting contact: {e}")
         return None
 
+    def send_image_base64(self, chat_id, mimetype, filename, base64_data, caption=None):
+        url = f"{self.api_url.rstrip('/')}/api/sendImage"
+        payload = {
+            "session": "default",
+            "chatId": chat_id,
+            "file": {
+                "mimetype": mimetype,
+                "filename": filename,
+                "data": base64_data
+            }
+        }
+        if caption:
+            payload["caption"] = caption
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["X-Api-Key"] = self.api_key
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=15)
+            return response.status_code in [200, 201]
+        except Exception as e:
+            print(f"Error sending image base64: {e}")
+            return False
+
+
 
 def send_whatsapp_notification(text):
     api_url = os.getenv('WHATSAPP_API_URL', 'http://waha:3000')

@@ -34,7 +34,7 @@ def create_app():
     from .whatsapp import format_option_for_whatsapp
     app.jinja_env.globals.update(format_option_for_whatsapp=format_option_for_whatsapp)
 
-    from .models import User, Poll, Option, Vote
+    from .models import User, Poll, Option, Vote, WhatsAppSearch, WhatsAppRecruitment
 
     with app.app_context():
         db.create_all()
