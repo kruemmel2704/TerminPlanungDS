@@ -146,8 +146,8 @@ def google_callback():
         'client_secret': credentials.client_secret,
         'scopes': credentials.scopes
     })
-    
-    db.session.commit()    flash('Google Kalender erfolgreich verknüpft!', category='success')
+    db.session.commit()
+    flash('Google Kalender erfolgreich verknüpft!', category='success')
     return redirect('/#/admin/select-calendar')
 
 @auth.route('/api/google/calendars', methods=['GET'])
