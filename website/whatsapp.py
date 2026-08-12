@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, make_response
 from flask_login import login_required, current_user
 from .whatsapp_utils import WhatsAppClient, normalize_id
-from .models import Poll, Option, Vote, User, WhatsAppState
+from .models import Poll, Option, Vote, User, WhatsAppState, WhatsAppSearch, WhatsAppRecruitment
 from . import db
 from datetime import datetime, timedelta
 import json
@@ -33,11 +33,19 @@ def dashboard():
     if state in ['online', 'authorized']:
         groups = wa_client.get_groups()
 
+    recruitment = WhatsAppRecruitment.query.first()
+    if not recruitment:
+        recruitment = WhatsAppRecruitment(is_active=False, message="", groups="[]")
+        db.session.add(recruitment)
+        db.session.commit()
+
     return render_template("whatsapp.html", 
                            status=state, 
                            qr_data=qr_data, 
                            groups=groups,
+                           recruitment=recruitment,
                            user=current_user)
+
 
 @whatsapp.route('/whatsapp/set_default', methods=['POST'])
 @login_required
@@ -79,6 +87,73 @@ def set_admin_chat():
         flash('Admin-Chat wurde entfernt.', category='success')
         
     return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/set_search_groups', methods=['POST'])
+@login_required
+def set_search_groups():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    selected_groups = request.form.getlist('search_groups')
+    current_user.whatsapp_search_groups = json.dumps(selected_groups)
+    db.session.commit()
+    
+    flash('Vordefinierte Gruppen für die Suche wurden gespeichert.', category='success')
+    return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/set_recruitment', methods=['POST'])
+@login_required
+def set_recruitment():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    is_active = bool(request.form.get('is_active'))
+    message = request.form.get('message') or ""
+    selected_groups = request.form.getlist('recruitment_groups')
+    
+    recruitment = WhatsAppRecruitment.query.first()
+    if not recruitment:
+        recruitment = WhatsAppRecruitment()
+        db.session.add(recruitment)
+        
+    recruitment.is_active = is_active
+    recruitment.message = message
+    recruitment.groups = json.dumps(selected_groups)
+    db.session.commit()
+    
+    flash('Anwerbe-Einstellungen wurden gespeichert.', category='success')
+    return redirect(url_for('whatsapp.dashboard'))
+
+@whatsapp.route('/whatsapp/test_recruitment', methods=['POST'])
+@login_required
+def test_recruitment():
+    if not current_user.is_admin:
+        return redirect(url_for('routes.home'))
+        
+    message = request.form.get('message') or ""
+    selected_groups = request.form.getlist('recruitment_groups')
+    
+    if not message:
+        flash('Bitte gib einen Anwerbe-Text ein!', category='error')
+        return redirect(url_for('whatsapp.dashboard'))
+        
+    if not selected_groups:
+        flash('Bitte wähle mindestens eine Empfänger-Gruppe aus!', category='error')
+        return redirect(url_for('whatsapp.dashboard'))
+        
+    success_count = 0
+    for group_id in selected_groups:
+        success = wa_client.send_message(group_id, message)
+        if success:
+            success_count += 1
+            
+    if success_count > 0:
+        flash(f'Test-Nachricht wurde erfolgreich an {success_count} Gruppe(n) gesendet!', category='success')
+    else:
+        flash('Fehler beim Senden der Test-Nachricht. Bitte überprüfe die WhatsApp-Verbindung.', category='error')
+        
+    return redirect(url_for('whatsapp.dashboard'))
+
 
 @whatsapp.route('/whatsapp/logout')
 @login_required
@@ -130,7 +205,36 @@ def share_poll(poll_id):
     groups = wa_client.get_groups()
     return render_template("whatsapp_share.html", poll=poll, groups=groups, user=current_user)
 
+def get_sticker_base64():
+    import base64
+    import os
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    sticker_path = os.path.join(base_dir, 'static', 'images', 'tcw_sticker.png')
+    try:
+        if os.path.exists(sticker_path):
+            with open(sticker_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        else:
+            print(f"Sticker file not found at: {sticker_path}")
+            return None
+    except Exception as e:
+        print(f"Error reading sticker file: {e}")
+        return None
+
+def send_search_post_now(groups_list):
+    sticker_base64 = get_sticker_base64()
+    for group_id in groups_list:
+        if sticker_base64:
+            wa_client.send_image_base64(
+                chat_id=group_id,
+                mimetype="image/png",
+                filename="tcw_sticker.png",
+                base64_data=sticker_base64
+            )
+        wa_client.send_message(group_id, "Deadshot Syndicate sucht ein Cw 4vs4 SnD HC heute um 20:30 Uhr ihr habt interesse? meldet euch")
+
 DE_DAYS = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
+
 
 def format_option_for_whatsapp(option):
     day_name = DE_DAYS[option.start_time.weekday()]
@@ -255,13 +359,34 @@ def webhook():
     
     if event == 'message':
         payload = data.get('payload', {})
+        if payload.get('fromMe'):
+            return jsonify({"status": "ignored"}), 200
+            
         sender_jid = normalize_id(payload.get('from'))
         chat_id = normalize_id(payload.get('chatId') or payload.get('from'))
         body = (payload.get('body') or "").strip()
         
         # Check if the chat where the message was received is a configured admin chat
         admin_user = User.query.filter_by(whatsapp_admin_chat_id=chat_id, is_admin=True).first()
-        
+
+        # If this is from an admin chat, check if they are replying to an opponent message
+        if admin_user:
+            reply_to = payload.get('replyTo')
+            if reply_to:
+                quoted_body = reply_to.get('body') or ""
+                if "[Opponent: " in quoted_body and "]" in quoted_body:
+                    try:
+                        opponent_jid = quoted_body.split("[Opponent: ")[1].split("]")[0].strip()
+                        if opponent_jid:
+                            success = wa_client.send_message(opponent_jid, body)
+                            if success:
+                                wa_client.send_message(chat_id, "✅ Nachricht an den Gegner weitergeleitet.", reply_to=payload.get('id'))
+                            else:
+                                wa_client.send_message(chat_id, "❌ Fehler beim Weiterleiten an den Gegner.", reply_to=payload.get('id'))
+                            return jsonify({"status": "success"}), 200
+                    except Exception as e:
+                        print(f"Error forwarding admin reply: {e}")
+
         # Check if the admin sent /abstimmung
         if body.lower() == '/abstimmung':
             if not admin_user:
@@ -405,7 +530,159 @@ def webhook():
                 
             wa_client.send_message(chat_id, msg)
             return jsonify({"status": "success"}), 200
+
+        elif body.lower() == '/suche-starten':
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
+                return jsonify({"status": "unauthorized"}), 200
+
+            # Clear any existing state for this chat
+            WhatsAppState.query.filter_by(chat_id=chat_id).delete()
+            db.session.commit()
+
+            # Check for predefined groups
+            predefined_groups = []
+            if admin_user.whatsapp_search_groups:
+                try:
+                    predefined_groups = json.loads(admin_user.whatsapp_search_groups)
+                except Exception:
+                    pass
+
+            if predefined_groups:
+                search = WhatsAppSearch.query.first()
+                if not search:
+                    search = WhatsAppSearch()
+                    db.session.add(search)
+
+                search.is_active = True
+                search.groups = json.dumps(predefined_groups)
+                search.last_sent_at = datetime.utcnow()
+                db.session.commit()
+
+                # Get names for confirmation
+                all_groups = wa_client.get_groups()
+                group_names = []
+                for gid in predefined_groups:
+                    matched = next((g['groupName'] for g in all_groups if g['id'] == gid), None)
+                    group_names.append(matched or gid)
+
+                groups_str = ", ".join(group_names)
+                wa_client.send_message(chat_id, f"✅ *Suche wurde gestartet!*\n\nGruppen (Vordefiniert):\n{groups_str}\n\nDer Bot postet nun stündlich die Suchanfrage in diese Gruppen.")
+                
+                # Trigger search post immediately
+                send_search_post_now(predefined_groups)
+                return jsonify({"status": "success"}), 200
+
+            groups = wa_client.get_groups()
+            groups = [g for g in groups if g['id'].endswith('@g.us')]
+
+            if not groups:
+                wa_client.send_message(chat_id, "❌ Keine WhatsApp-Gruppen für die Suche gefunden.")
+                return jsonify({"status": "no_groups"}), 200
+
+            # Limit groups to 11 to fit within the WhatsApp poll maximum options (12 options total)
+            groups = groups[:11]
+
+            options = []
+            group_mapping = []
+            for idx, g in enumerate(groups, 1):
+                name = g['groupName']
+                options.append(f"[{idx}] {name}")
+                group_mapping.append({"index": idx, "id": g['id'], "name": name})
+
+            options.append("👉 [START] Suche starten")
+
+            new_state = WhatsAppState(
+                chat_id=chat_id,
+                sender_jid=sender_jid,
+                state='awaiting_search_groups',
+                dates=json.dumps(group_mapping)
+            )
+            db.session.add(new_state)
+            db.session.commit()
+
+            poll_name = "🔍 Wähle die Gruppen für die TCW-Suche aus (Mehrfachauswahl möglich, danach 'Suche starten' wählen):"
+            resp = wa_client.send_poll(chat_id, poll_name, options, multiple_answers=True)
+            if resp and resp.get('id'):
+                new_state.whatsapp_poll_id = normalize_id(resp.get('id'))
+                db.session.commit()
+            else:
+                wa_client.send_message(chat_id, "❌ Fehler beim Senden der Gruppen-Auswahl. Bitte versuche es erneut.")
+            return jsonify({"status": "success"}), 200
+
+        elif body.lower() == '/suche-stoppen':
+            if not admin_user:
+                wa_client.send_message(chat_id, "❌ Dieser Chat ist nicht als Admin-Chat autorisiert. Bitte konfiguriere ihn in den Einstellungen unter /whatsapp.")
+                return jsonify({"status": "unauthorized"}), 200
+
+            search = WhatsAppSearch.query.first()
+            if not search or not search.is_active:
+                wa_client.send_message(chat_id, "ℹ️ Es läuft aktuell keine aktive Suche.")
+                return jsonify({"status": "no_active_search"}), 200
+
+            search.is_active = False
+            db.session.commit()
+
+            wa_client.send_message(chat_id, "⏹️ *Suche wurde beendet.*")
+            return jsonify({"status": "success"}), 200
+
+        # Check if it is a user DM (not a group chat)
+        if not chat_id.endswith('@g.us'):
+            body_lower = body.lower()
+            import re
+            words = re.findall(r'\b\w+\b', body_lower)
+            is_query = (
+                "tcw" in words or
+                "cw" in words or
+                "gegner" in words or
+                "spielmöglichkeit" in body_lower or
+                "sucht ihr" in body_lower or
+                "suchen noch" in body_lower or
+                "habt ihr noch" in body_lower or
+                "suche" in body_lower or
+                "interresse" in body_lower or
+                "wir hätten" in body_lower or
+                "seit" in body_lower or
+                "sucht" in body_lower or
+                "suchen" in body_lower or
+                "habt" in body_lower or
+                "interresse" in body_lower or
+                "hätte " in body_lower or
+                "zu wann" in body_lower
+            )
             
+            search = WhatsAppSearch.query.first()
+            search_active = search and search.is_active
+            
+            if search_active:
+                contact_name = None
+                contact_data = wa_client.get_contact(sender_jid)
+                if contact_data:
+                    contact_name = contact_data.get('name') or contact_data.get('pushname') or contact_data.get('shortName')
+                
+                phone = sender_jid.split('@')[0]
+                display_name = f"{contact_name} (+{phone})" if contact_name else f"+{phone}"
+                
+                if is_query:
+                    wa_client.send_message(chat_id, "Ja ein Teammitglied wird sich bald melden für weitere details.")
+                    
+                    # Notify admin chat
+                    admin_users = User.query.filter(User.whatsapp_admin_chat_id != None, User.is_admin == True).all()
+                    for admin in admin_users:
+                        admin_msg = f"🔔 *Es wurde eine Spielmöglichkeit gefunden!*\n\nAnfrage von: {display_name}\nNachricht: \"{body}\"\n\n👉 Antworte (zitiere) auf diese Nachricht, um dem Gegner zu schreiben.\n[Opponent: {sender_jid}]"
+                        wa_client.send_message(admin.whatsapp_admin_chat_id, admin_msg)
+                else:
+                    # Just forward the message to admin chat
+                    admin_users = User.query.filter(User.whatsapp_admin_chat_id != None, User.is_admin == True).all()
+                    for admin in admin_users:
+                        admin_msg = f"💬 *Nachricht von Gegner* ({display_name}):\n\"{body}\"\n\n👉 Antworte (zitiere) auf diese Nachricht, um zu schreiben.\n[Opponent: {sender_jid}]"
+                        wa_client.send_message(admin.whatsapp_admin_chat_id, admin_msg)
+                return jsonify({"status": "success"}), 200
+            else:
+                if is_query:
+                    wa_client.send_message(chat_id, "Tut uns leid wir haben schon ein Match gefunden.")
+                    return jsonify({"status": "success"}), 200
+
         # If not /abstimmung, check if this chat has an active setup state
         state_record = WhatsAppState.query.filter_by(chat_id=chat_id).first()
         if state_record:
@@ -532,7 +809,63 @@ def webhook():
             if state_record:
                 if not selected_options:
                     return jsonify({"status": "ignored"}), 200
-                    
+
+                if state_record.state == 'awaiting_search_groups':
+                    has_start = any("Suche starten" in opt for opt in selected_options)
+                    if not has_start:
+                        return jsonify({"status": "waiting_for_start"}), 200
+
+                    # Extract selected indices
+                    import re
+                    selected_indices = []
+                    for opt in selected_options:
+                        match = re.match(r'^\[(\d+)\]', opt)
+                        if match:
+                            selected_indices.append(int(match.group(1)))
+
+                    if not selected_indices:
+                        wa_client.send_message(state_record.chat_id, "❌ Bitte wähle mindestens eine Gruppe aus, bevor du die Suche startest.")
+                        return jsonify({"status": "no_groups_selected"}), 200
+
+                    try:
+                        group_mapping = json.loads(state_record.dates)
+                    except Exception:
+                        group_mapping = []
+
+                    selected_group_ids = []
+                    selected_group_names = []
+                    for mapping in group_mapping:
+                        if mapping["index"] in selected_indices:
+                            selected_group_ids.append(mapping["id"])
+                            selected_group_names.append(mapping["name"])
+
+                    if not selected_group_ids:
+                        wa_client.send_message(state_record.chat_id, "❌ Keine gültigen Gruppen ausgewählt.")
+                        return jsonify({"status": "invalid_groups"}), 200
+
+                    # Start/update search state
+                    search = WhatsAppSearch.query.first()
+                    if not search:
+                        search = WhatsAppSearch()
+                        db.session.add(search)
+
+                    search.is_active = True
+                    search.groups = json.dumps(selected_group_ids)
+                    search.last_sent_at = datetime.utcnow()
+                    db.session.commit()
+
+                    # Delete State Record
+                    db.session.delete(state_record)
+                    db.session.commit()
+
+                    # Notify Admin
+                    groups_str = ", ".join(selected_group_names)
+                    wa_client.send_message(state_record.chat_id, f"✅ *Suche wurde gestartet!*\n\nGruppen:\n{groups_str}\n\nDer Bot postet nun stündlich die Suchanfrage in diese Gruppen.")
+
+                    # Trigger post immediately
+                    send_search_post_now(selected_group_ids)
+                    return jsonify({"status": "success"}), 200
+
                 selected_option = selected_options[0]
                 
                 if state_record.state == 'awaiting_type':
@@ -739,7 +1072,7 @@ def api_set_admin_chat():
         
     data = request.json
     chat_id = data.get('admin_chat_id')
-    chat_name = data.get('admin_chat_name')
+    chat_name = data.get('chat_name')
     
     if chat_id:
         current_user.whatsapp_admin_chat_id = chat_id
@@ -814,6 +1147,75 @@ def api_share_poll(poll_id):
     else:
         return jsonify({'message': 'Fehler beim Starten der WhatsApp-Umfrage.'}), 500
 
+@whatsapp.route('/api/whatsapp/chats', methods=['GET'])
+def api_get_chats():
+    import os
+    api_key = request.headers.get('X-Api-Key') or request.args.get('api_key')
+    expected_key = os.getenv('INTERNAL_API_KEY')
+    if expected_key and api_key != expected_key:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    status_resp = wa_client.get_status()
+    state = status_resp.get('stateInstance')
+    if state not in ['online', 'authorized']:
+        return jsonify({"status": "error", "message": "WhatsApp client is not connected.", "state": state}), 400
+        
+    groups = wa_client.get_groups()
+    return jsonify({"status": "success", "chats": groups})
+
+
+@whatsapp.route('/api/whatsapp/send', methods=['POST'])
+def api_send_message():
+    import os
+    api_key = request.headers.get('X-Api-Key') or request.args.get('api_key')
+    expected_key = os.getenv('INTERNAL_API_KEY')
+    if expected_key and api_key != expected_key:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    data = request.json or {}
+    chat_id = data.get('chat_id')
+    message = data.get('message')
+    if not chat_id or not message:
+        return jsonify({"status": "error", "message": "Missing chat_id or message"}), 400
+        
+    success = wa_client.send_message(chat_id, message)
+    if success:
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"status": "error", "message": "Failed to send message via WhatsApp"}), 500
+
+
+@whatsapp.route('/api/polls/active', methods=['GET', 'OPTIONS'])
+def api_get_active_polls():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        return response
+        
+    active_polls = Poll.query.filter_by(is_active=True).all()
+    polls_data = []
+    for poll in active_polls:
+        options_data = []
+        for opt in poll.options:
+            options_data.append({
+                "id": opt.id,
+                "start_time": opt.start_time.isoformat(),
+                "end_time": opt.end_time.isoformat()
+            })
+        polls_data.append({
+            "id": poll.id,
+            "title": poll.title,
+            "description": poll.description,
+            "deadline": poll.deadline.isoformat() if poll.deadline else None,
+            "poll_type": poll.poll_type,
+            "options": options_data
+        })
+    response = jsonify({"status": "success", "polls": polls_data})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response
+
 
 def start_reminder_scheduler(app):
     import threading
@@ -874,6 +1276,73 @@ def start_reminder_scheduler(app):
                                     print(f"Sent daily reminder for poll {poll.id} as a reply to {poll.whatsapp_poll_id}")
                                 else:
                                     print(f"Failed to send daily reminder for poll {poll.id}")
+                
+                # Check for scheduled recruitment messages (12:00 and 18:00 UTC+1)
+                if now.hour in [12, 18]:
+                    with app.app_context():
+                        from .models import WhatsAppRecruitment
+                        recruitment = WhatsAppRecruitment.query.first()
+                        if recruitment and recruitment.is_active and recruitment.message:
+                            try:
+                                groups_list = json.loads(recruitment.groups or "[]")
+                            except Exception:
+                                groups_list = []
+                            
+                            if groups_list:
+                                should_send = False
+                                now_utc = datetime.utcnow()
+                                
+                                if now.hour == 12:
+                                    if not recruitment.last_sent_at_12:
+                                        should_send = True
+                                    else:
+                                        last_sent_12_utc_plus_1 = recruitment.last_sent_at_12.replace(tzinfo=timezone.utc).astimezone(tz_utc_plus_1)
+                                        if last_sent_12_utc_plus_1.date() != now.date():
+                                            should_send = True
+                                elif now.hour == 18:
+                                    if not recruitment.last_sent_at_18:
+                                        should_send = True
+                                    else:
+                                        last_sent_18_utc_plus_1 = recruitment.last_sent_at_18.replace(tzinfo=timezone.utc).astimezone(tz_utc_plus_1)
+                                        if last_sent_18_utc_plus_1.date() != now.date():
+                                            should_send = True
+                                            
+                                if should_send:
+                                    print(f"Sending scheduled recruitment message at {now.hour}:00 UTC+1 to groups: {groups_list}")
+                                    for g_id in groups_list:
+                                        wa_client.send_message(g_id, recruitment.message)
+                                    
+                                    if now.hour == 12:
+                                        recruitment.last_sent_at_12 = now_utc
+                                    else:
+                                        recruitment.last_sent_at_18 = now_utc
+                                    db.session.commit()
+                
+                # Check for active TCW searches
+                with app.app_context():
+                    search = WhatsAppSearch.query.first()
+                    if search and search.is_active:
+                        now_utc = datetime.utcnow()
+                        should_send = False
+                        if not search.last_sent_at:
+                            should_send = True
+                        else:
+                            elapsed = now_utc - search.last_sent_at
+                            if elapsed >= timedelta(hours=1):
+                                should_send = True
+                                
+                        if should_send:
+                            try:
+                                groups_list = json.loads(search.groups)
+                            except Exception:
+                                groups_list = []
+                                
+                            if groups_list:
+                                send_search_post_now(groups_list)
+                                
+                            search.last_sent_at = now_utc
+                            db.session.commit()
+                            print("Sent hourly search post to groups. Active search in progress.")
                 
                 # Sleep 60 seconds to avoid repeating within the same hour
                 time.sleep(60)

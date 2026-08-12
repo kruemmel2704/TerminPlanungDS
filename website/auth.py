@@ -147,9 +147,82 @@ def google_callback():
         'scopes': credentials.scopes
     })
     
+    db.session.commit()    flash('Google Kalender erfolgreich verknüpft!', category='success')
+    return redirect('/#/admin/select-calendar')
+
+@auth.route('/api/google/calendars', methods=['GET'])
+@login_required
+def api_google_calendars():
+    from flask import jsonify
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+    from .calendar_utils import get_calendar_list
+    calendars = get_calendar_list(current_user)
+    return jsonify(calendars)
+
+@auth.route('/api/google/select-calendar', methods=['POST'])
+@login_required
+def api_select_calendar():
+    from flask import jsonify
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+        
+    data = request.json or {}
+    option = data.get('calendar_option')
+    make_public = data.get('make_public') == 'y'
+    
+    from .calendar_utils import create_league_calendar, get_calendar_service
+    
+    if option == 'create':
+        name = data.get('new_calendar_name', 'Liga Spielplan (Allgemein)')
+        cal_id = create_league_calendar(current_user, summary=name, make_public=make_public)
+        if cal_id:
+            current_user.google_calendar_id = cal_id
+            current_user.google_calendar_name = name
+            db.session.commit()
+            return jsonify({'message': f'Neuer Kalender "{name}" wurde erfolgreich erstellt und verknüpft!'})
+        return jsonify({'message': 'Fehler beim Erstellen des neuen Kalenders.'}), 500
+        
+    elif option == 'existing':
+        cal_id = data.get('existing_calendar_id')
+        if not cal_id:
+            return jsonify({'message': 'Bitte wähle einen existierenden Kalender aus!'}), 400
+            
+        service = get_calendar_service(current_user)
+        summary = "Google Kalender"
+        if service:
+            try:
+                cal_meta = service.calendars().get(calendarId=cal_id).execute()
+                summary = cal_meta.get('summary', 'Google Kalender')
+                
+                if make_public:
+                    rule = {
+                        'scope': {'type': 'default'},
+                        'role': 'reader'
+                    }
+                    service.acl().insert(calendarId=cal_id, body=rule).execute()
+            except Exception as e:
+                print(f"Error fetching/updating existing calendar: {e}")
+                
+        current_user.google_calendar_id = cal_id
+        current_user.google_calendar_name = summary
+        db.session.commit()
+        return jsonify({'message': f'Erfolgreich mit dem Kalender "{summary}" verknüpft!'})
+        
+    return jsonify({'message': 'Ungültige Option'}), 400
+
+@auth.route('/api/google/disconnect', methods=['POST'])
+@login_required
+def api_disconnect_google():
+    from flask import jsonify
+    if not current_user.is_admin:
+        return jsonify({'message': 'Kein Zugriff!'}), 403
+    current_user.google_token = None
+    current_user.google_calendar_id = None
+    current_user.google_calendar_name = None
     db.session.commit()
-    flash('Google Kalender erfolgreich verknüpft!', category='success')
-    return redirect('/#/admin')
+    return jsonify({'message': 'Verbindung mit Google Kalender wurde getrennt.'})
+
 
 @auth.route('/logout')
 @login_required
